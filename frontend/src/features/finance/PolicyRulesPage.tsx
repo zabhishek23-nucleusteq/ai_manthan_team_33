@@ -28,7 +28,7 @@ import { ACTION_META, limitText, UNIT_LABEL } from './financeFormat'
 
 function ActionTag({ r }: { r: PolicyRule }) {
   if (isSetting(r)) return <Tag>Setting</Tag>
-  const m = ACTION_META[r.action as PolicyAction]
+  const m = ACTION_META[r.action as PolicyAction] ?? { label: String(r.action), color: 'default' }
   return <Tag color={m.color}>{m.label}</Tag>
 }
 
@@ -91,7 +91,7 @@ function EditRuleDrawer({ rule, onClose }: { rule: PolicyRule | null; onClose: (
           layout="vertical"
           requiredMark={false}
           disabled={update.isPending}
-          initialValues={{ limitAmount: rule.limitAmount, action: rule.action ?? undefined, enabled: rule.enabled }}
+          initialValues={{ limitAmount: rule.limitAmount, action: isSetting(rule) ? undefined : (rule.action as PolicyAction), enabled: rule.enabled }}
           onFinish={onFinish}
         >
           <Typography.Paragraph type="secondary">{rule.description}</Typography.Paragraph>

@@ -1,4 +1,5 @@
 import { err, mockRoute, type MockRequest, type MockResponse } from '../../api/mock/router'
+// Same payload as the real API: settings have action CONFIG, SAMPLE_AUDIT_RATE has unit RATE (T-031 blank-page bug).
 // Registered from api/mock/handlers.ts registerDefaultMocks(); state reset by resetMockState().
 import type { PayoutBatch, PayoutEligible, PolicyRule } from './financeApi'
 
@@ -49,10 +50,10 @@ function buildRules(): PolicyRule[] {
     r('DUPLICATE_LINE', 'BR-6 Same vendor + amount + date as an earlier line', null, 'PER_LINE', 'REJECT'),
     r('DUPLICATE_RECEIPT', 'BR-7 Same receipt file (SHA-256) as an earlier line', null, 'PER_LINE', 'REJECT'),
     r('WEEKEND_SPEND', 'BR-8 Weekend spend flagged for manager attention', null, 'PER_LINE', 'ROUTE'),
-    r('AUTO_APPROVE_MAX', 'BR-9 Clean claims up to this total are auto-approved (INR)', 5000, 'PER_CLAIM', null),
-    r('CHAIN_AUDITOR_ABOVE', 'BR-11 Finance auditor approval needed above this total (INR)', 25000, 'PER_CLAIM', null),
-    r('CHAIN_HEAD_ABOVE', 'BR-12 Finance head approval needed above this total (INR)', 100000, 'PER_CLAIM', null),
-    r('SAMPLE_AUDIT_RATE', 'BR-13 Share of auto-approved claims flagged for sample audit (0-1)', 0.1, null, null),
+    r('AUTO_APPROVE_MAX', 'BR-9 Clean claims up to this total are auto-approved (INR)', 5000, 'PER_CLAIM', 'CONFIG'),
+    r('CHAIN_AUDITOR_ABOVE', 'BR-11 Finance auditor approval needed above this total (INR)', 25000, 'PER_CLAIM', 'CONFIG'),
+    r('CHAIN_HEAD_ABOVE', 'BR-12 Finance head approval needed above this total (INR)', 100000, 'PER_CLAIM', 'CONFIG'),
+    r('SAMPLE_AUDIT_RATE', 'BR-13 Share of auto-approved claims flagged for sample audit (0-1)', 0.1, 'RATE', 'CONFIG'),
   ]
 }
 
@@ -180,8 +181,8 @@ export function registerFinanceMocks(): void {
       return err(400, 'VALIDATION_FAILED', 'Validation failed', { fields: { limitAmount: 'must be greater than or equal to 0' } })
     if (rule.code === 'SAMPLE_AUDIT_RATE' && b.limitAmount !== undefined && b.limitAmount > 1)
       return err(422, 'POLICY_RULE_INVALID', 'SAMPLE_AUDIT_RATE must be between 0 and 1')
-    if (!rule.action && b.action) return err(422, 'POLICY_RULE_INVALID', `${rule.code} is a setting and has no action`)
-    if (!rule.action && b.enabled === false) return err(422, 'POLICY_RULE_INVALID', `${rule.code} cannot be disabled`)
+    if (rule.action === 'CONFIG' && b.action) return err(422, 'POLICY_RULE_INVALID', `${rule.code} is a setting and has no action`)
+    if (rule.action === 'CONFIG' && b.enabled === false) return err(422, 'POLICY_RULE_INVALID', `${rule.code} cannot be disabled`)
     Object.assign(rule, {
       ...(b.limitAmount !== undefined ? { limitAmount: b.limitAmount } : {}),
       ...(b.action ? { action: b.action } : {}),
