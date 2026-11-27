@@ -39,4 +39,13 @@ public interface ClaimRepository extends JpaRepository<Claim, Long> {
             + "and not exists (select 1 from payout_items i where i.claim_id = c.id) order by c.id for update skip locked",
             nativeQuery = true)
     java.util.List<Long> lockPayableClaimIds();
+
+    /** Same filter as {@link #lockPayableClaimIds()} without locking, for the "create batch" confirm (T-031). */
+    @Query(value = "select count(*) from claims c where c.status = 'APPROVED' and c.sample_audit not in ('PENDING', 'EXCEPTION') "
+            + "and not exists (select 1 from payout_items i where i.claim_id = c.id)", nativeQuery = true)
+    long countPayable();
+
+    @Query(value = "select coalesce(sum(c.total_amount), 0) from claims c where c.status = 'APPROVED' and c.sample_audit not in ('PENDING', 'EXCEPTION') "
+            + "and not exists (select 1 from payout_items i where i.claim_id = c.id)", nativeQuery = true)
+    java.math.BigDecimal sumPayable();
 }

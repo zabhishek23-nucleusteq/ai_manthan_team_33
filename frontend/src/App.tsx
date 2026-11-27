@@ -19,6 +19,8 @@ import { ClaimDetailPage } from './features/customer/ClaimDetailPage'
 import { ClaimEditorPage } from './features/customer/ClaimEditorPage'
 import { ClaimOutcomePage } from './features/customer/ClaimOutcomePage'
 import { ClaimsListPage } from './features/customer/ClaimsListPage'
+import { PayoutsPage } from './features/finance/PayoutsPage'
+import { PolicyRulesPage } from './features/finance/PolicyRulesPage'
 import { ApprovalDetailPage } from './features/staff/ApprovalDetailPage'
 import { ApprovalsInboxPage } from './features/staff/ApprovalsInboxPage'
 import { DelegationsPage } from './features/staff/DelegationsPage'
@@ -175,6 +177,24 @@ export function AppRoutes() {
         element={
           <RequireRole roles={['MANAGER', 'FINANCE_AUDITOR', 'FINANCE_HEAD']}>
             <DelegationsPage />
+          </RequireRole>
+        }
+      />
+
+      {/* Finance head payout batches + policy rules (T-031; read access per rbac.md section 3). */}
+      <Route
+        path="/payouts"
+        element={
+          <RequireRole roles={['FINANCE_AUDITOR', 'FINANCE_HEAD']}>
+            <PayoutsPage />
+          </RequireRole>
+        }
+      />
+      <Route
+        path="/policy-rules"
+        element={
+          <RequireRole roles={['MANAGER', 'FINANCE_AUDITOR', 'FINANCE_HEAD', 'SUPER_ADMIN']}>
+            <PolicyRulesPage />
           </RequireRole>
         }
       />

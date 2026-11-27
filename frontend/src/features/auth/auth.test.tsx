@@ -117,7 +117,7 @@ describe('postLoginTarget / canOpen (T-509)', () => {
   it('falls back to the landing page when the user may not open ?next=', () => {
     expect(postLoginTarget('/claims', ['SUPER_ADMIN'])).toBe('/admin')
     expect(postLoginTarget('/admin/users', ['EMPLOYEE', 'MANAGER'])).toBe('/manager/dashboard')
-    expect(postLoginTarget('/payouts', ['EMPLOYEE', 'FINANCE_AUDITOR'])).toBe('/finance/dashboard')
+    expect(postLoginTarget('/payouts', ['EMPLOYEE', 'MANAGER'])).toBe('/manager/dashboard')
   })
 
   it('still rejects unsafe targets (open redirect) and missing next', () => {

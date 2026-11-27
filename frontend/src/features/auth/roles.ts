@@ -41,8 +41,8 @@ export const ROUTE_ROLES: ReadonlyArray<[string, readonly Role[]]> = [
   ['/delegations', ['MANAGER', 'FINANCE_AUDITOR', 'FINANCE_HEAD']],
   ['/finance', ['FINANCE_AUDITOR', 'FINANCE_HEAD']],
   ['/audit-queue', ['FINANCE_AUDITOR', 'FINANCE_HEAD']],
-  ['/payouts', ['FINANCE_HEAD']],
-  ['/policy-rules', ['FINANCE_HEAD']],
+  ['/payouts', ['FINANCE_AUDITOR', 'FINANCE_HEAD']],
+  ['/policy-rules', ['MANAGER', 'FINANCE_AUDITOR', 'FINANCE_HEAD', 'SUPER_ADMIN']],
   ['/admin', ['SUPER_ADMIN']],
 ]
 
