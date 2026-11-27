@@ -125,7 +125,8 @@ export async function handleMockRequest(
     break
   }
   const hasBody = out.body !== undefined && out.status !== 204
-  return new Response(hasBody ? JSON.stringify(out.body) : null, {
+  const rawText = typeof out.body === 'string' && !!out.headers?.['Content-Type'] && !out.headers['Content-Type'].includes('json') // e.g. text/csv
+  return new Response(hasBody ? (rawText ? (out.body as string) : JSON.stringify(out.body)) : null, {
     status: out.status,
     headers: { ...(hasBody ? { 'Content-Type': 'application/json' } : {}), ...out.headers },
   })

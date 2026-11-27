@@ -2,6 +2,7 @@ import type { ApprovalLevel, AuditEvent, Claim, ClaimInput, Comment, Violation }
 import { auditFor, buildClaims, buildComments, DEPARTMENTS, toSummary } from './fixtures'
 import { err, mockRoute, type MockRequest, type MockResponse } from './router'
 import { registerApprovalMocks, resetApprovalMocks } from '../../features/staff/approvalsMock'
+import { registerFinanceMocks, resetFinanceMocks } from '../../features/finance/financeMocks'
 
 /** In-memory state for the mock backend; reset with resetMockState(). */
 let claims: Claim[] = buildClaims()
@@ -20,6 +21,7 @@ export function resetMockState(): void {
   idempotency.clear()
   extraAudit.clear()
   resetApprovalMocks()
+  resetFinanceMocks()
 }
 
 const addAudit = (claimId: number, e: AuditEvent) => extraAudit.set(claimId, [...(extraAudit.get(claimId) ?? []), e])
@@ -108,6 +110,7 @@ function applyMockPolicy(c: Claim): void {
 let nextReceiptId = 500
 
 export function registerDefaultMocks(): void {
+  registerFinanceMocks() // T-031 payout batches + policy rules
   mockRoute('POST', '/api/receipts', ({ body }) => {
     const file = body instanceof FormData ? body.get('file') : null
     if (!(file instanceof Blob)) return err(400, 'VALIDATION_FAILED', 'file is required')

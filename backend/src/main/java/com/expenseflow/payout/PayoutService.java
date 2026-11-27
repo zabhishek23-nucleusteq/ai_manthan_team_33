@@ -106,6 +106,15 @@ public class PayoutService {
         });
     }
 
+    /** What "create batch" would take right now (count + total), for the UI confirm (T-031). */
+    public record Eligible(long count, java.math.BigDecimal total) {
+    }
+
+    public Eligible eligible() {
+        // Repeatable-read snapshot is not needed: this is a preview; create() re-selects and locks the rows.
+        return readTx.execute(s -> new Eligible(claims.countPayable(), claims.sumPayable().setScale(2, RoundingMode.HALF_UP)));
+    }
+
     // ---------------------------------------------------------------- read
     public <T> T read(long id, java.util.function.Function<PayoutBatch, T> mapper) {
         return readTx.execute(s -> mapper.apply(batches.findById(id).orElseThrow(PayoutService::notFound)));
