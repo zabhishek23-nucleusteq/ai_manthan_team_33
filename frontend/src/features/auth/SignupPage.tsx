@@ -97,7 +97,7 @@ export function SignupPage() {
         </Button>
       </Form>
       <Typography.Paragraph style={{ marginTop: 16, marginBottom: 0, textAlign: 'center' }}>
-        Already have an account? <Link to="/login">Log in</Link>
+        Already have an account? <Link to="/login" style={{ textDecoration: 'underline' }}>Log in</Link>
       </Typography.Paragraph>
     </AuthLayout>
   )

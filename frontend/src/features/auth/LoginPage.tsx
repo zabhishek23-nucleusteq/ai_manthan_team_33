@@ -96,7 +96,7 @@ export function LoginPage() {
       </Form>
 
       <Typography.Paragraph style={{ marginTop: 16, marginBottom: 0, textAlign: 'center' }}>
-        New here? <Link to="/signup">Create an account</Link>
+        New here? <Link to="/signup" style={{ textDecoration: 'underline' }}>Create an account</Link>
       </Typography.Paragraph>
 
       {isMockAuth() || import.meta.env.DEV ? (

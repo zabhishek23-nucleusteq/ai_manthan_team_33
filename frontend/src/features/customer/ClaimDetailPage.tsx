@@ -14,7 +14,6 @@ import {
   Space,
   Steps,
   Tabs,
-  Tag,
   Timeline,
   Typography,
 } from 'antd'
@@ -23,7 +22,7 @@ import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { isApiError } from '../../api/errors'
 import type { ApprovalStep, Claim } from '../../api/types'
-import { ClaimStatusTag } from '../../components/ClaimStatusTag'
+import { ClaimStatusTag, ToneTag } from '../../components/ClaimStatusTag'
 import { PageError, PageLoading } from '../../components/PageState'
 import {
   auditActionText,
@@ -68,9 +67,9 @@ function LinesTab({ claim }: { claim: Claim }) {
               <Space direction="vertical" size={2} style={{ marginTop: 8 }}>
                 {(l.violations ?? []).map((v) => (
                   <div key={v.code}>
-                    <Tag color={v.action === 'REJECT' ? 'error' : 'warning'} icon={<FlagOutlined />}>
+                    <ToneTag tone={v.action === 'REJECT' ? 'error' : 'warning'} icon={<FlagOutlined />}>
                       {VIOLATION_SHORT[v.code] ?? v.code}
-                    </Tag>
+                    </ToneTag>
                     <Typography.Text type="secondary">{v.message || VIOLATION_TEXT[v.code]}</Typography.Text>
                   </div>
                 ))}

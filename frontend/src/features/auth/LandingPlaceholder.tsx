@@ -1,5 +1,6 @@
 import { LogoutOutlined } from '@ant-design/icons'
-import { Button, Result, Space, Tag } from 'antd'
+import { Button, Result, Space } from 'antd'
+import { ToneTag } from '../../components/ClaimStatusTag'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from './authContext'
 import { ROLE_LABEL } from './roles'
@@ -21,9 +22,9 @@ export function LandingPlaceholder({ title }: { title: string }) {
           <Space direction="vertical" align="center">
             <Space wrap>
               {user?.roles.map((r) => (
-                <Tag key={r} color="blue">
+                <ToneTag key={r} tone="processing">
                   {ROLE_LABEL[r]}
-                </Tag>
+                </ToneTag>
               ))}
             </Space>
             <Button
