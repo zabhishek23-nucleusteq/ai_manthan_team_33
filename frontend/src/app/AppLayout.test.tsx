@@ -124,10 +124,10 @@ describe('app shell', () => {
     expect(screen.getAllByRole('button', { name: /log out/i })).toHaveLength(1)
   })
 
-  it('placeholder screens render inside the shell', async () => {
+  it('role screens render inside the shell', async () => {
     signIn('auditor')
     renderAt('/audit-queue')
-    expect(await screen.findByText('This screen is being built (T-026).')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /audit queue/i })).toBeInTheDocument()
     expect(screen.getAllByRole('main')).toHaveLength(1)
   })
 

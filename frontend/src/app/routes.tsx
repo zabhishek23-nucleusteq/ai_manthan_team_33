@@ -1,4 +1,3 @@
-import { Result } from 'antd'
 import type { ReactElement } from 'react'
 import { Route } from 'react-router-dom'
 import { AdminAuditPage } from '../features/admin/AdminAuditPage'
@@ -15,18 +14,11 @@ import { PayoutsPage } from '../features/finance/PayoutsPage'
 import { PolicyRulesPage } from '../features/finance/PolicyRulesPage'
 import { ApprovalDetailPage } from '../features/staff/ApprovalDetailPage'
 import { ApprovalsInboxPage } from '../features/staff/ApprovalsInboxPage'
+import { AuditQueuePage } from '../features/staff/AuditQueuePage'
 import { DelegationsPage } from '../features/staff/DelegationsPage'
 import { AppLayout } from './AppLayout'
 import { rolesOf, type Role } from './roles'
 import './app.css'
-
-function ComingSoon({ title, task }: { title: string; task: string }) {
-  return (
-    <main>
-      <Result status="info" title={title} subTitle={`This screen is being built (${task}).`} />
-    </main>
-  )
-}
 
 /** Signed-in pages. Roles come from NAV_ITEMS (rbac.md §2) so menu and guard always agree. */
 const PAGES: { path: string; roles: readonly Role[]; element: ReactElement }[] = [
@@ -44,7 +36,7 @@ const PAGES: { path: string; roles: readonly Role[]; element: ReactElement }[] =
   { path: '/delegations', roles: rolesOf('/delegations'), element: <DelegationsPage /> },
   // Finance
   { path: '/finance/dashboard', roles: rolesOf('/finance/dashboard'), element: <DashboardPage title="Finance dashboard" /> },
-  { path: '/audit-queue', roles: rolesOf('/audit-queue'), element: <ComingSoon title="Audit queue" task="T-026" /> },
+  { path: '/audit-queue', roles: rolesOf('/audit-queue'), element: <AuditQueuePage /> },
   // Read access per rbac.md §3 (T-031): auditor views batches; MGR/AUD/ADMIN view rules. Menu stays per §2.
   { path: '/payouts', roles: ['FINANCE_AUDITOR', 'FINANCE_HEAD'], element: <PayoutsPage /> },
   { path: '/policy-rules', roles: ['MANAGER', 'FINANCE_AUDITOR', 'FINANCE_HEAD', 'SUPER_ADMIN'], element: <PolicyRulesPage /> },
