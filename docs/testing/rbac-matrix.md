@@ -3,15 +3,17 @@
 Generated from `tests/e2e/api/rbac.spec.ts`, which encodes `docs/architecture/rbac.md` section 3.
 Regenerate: start the stack (`./start.ps1`), then in `tests/e2e`: `npm run test:api; npm run rbac:summary`.
 
-Last run: 2026-11-27 - **42 passed, 0 failed, 81 skipped** of 123.
+Last run: 2026-11-27 - **61 passed, 0 failed, 2 known bugs, 60 skipped** of 123.
 
 Per endpoint: (1) no token -> 401; (2) an allowed role is not 401/403/5xx; (3) a role without access -> 403.
 Checks 2 and 3 are skipped until the endpoint is in `/v3/api-docs` and the seeded demo users (T-013) can log in; skips are not passes.
 
-| Check | Result | Skip reason |
+KNOWN BUG = the backend deviates from rbac.md; the check is expected to fail until the linked bug task is fixed.
+
+| Check | Result | Note |
 |---|---|---|
 | GET /api/auth/me: no token -> 401 | pass |  |
-| GET /api/auth/me: allowed role is not rejected | skipped | no allowed demo user can log in yet (seed data, T-013) |
+| GET /api/auth/me: allowed role is not rejected | pass |  |
 | GET /api/auth/me: a role without access -> 403 | skipped | no demo user without access can log in yet (seed data, T-013) |
 | GET /api/claims: no token -> 401 | pass |  |
 | GET /api/claims: allowed role is not rejected | skipped | endpoint not implemented yet (not in /v3/api-docs) |
@@ -38,8 +40,8 @@ Checks 2 and 3 are skipped until the endpoint is in `/v3/api-docs` and the seede
 | GET /api/receipts/{id}/content: allowed role is not rejected | skipped | endpoint not implemented yet (not in /v3/api-docs) |
 | GET /api/receipts/{id}/content: a role without access -> 403 | skipped | endpoint not implemented yet (not in /v3/api-docs) |
 | GET /api/claims/{id}/audit: no token -> 401 | pass |  |
-| GET /api/claims/{id}/audit: allowed role is not rejected | skipped | no allowed demo user can log in yet (seed data, T-013) |
-| GET /api/claims/{id}/audit: a role without access -> 403 | skipped | no demo user without access can log in yet (seed data, T-013) |
+| GET /api/claims/{id}/audit: allowed role is not rejected | pass |  |
+| GET /api/claims/{id}/audit: a role without access -> 403 | pass |  |
 | GET /api/claims/{id}/comments: no token -> 401 | pass |  |
 | GET /api/claims/{id}/comments: allowed role is not rejected | skipped | endpoint not implemented yet (not in /v3/api-docs) |
 | GET /api/claims/{id}/comments: a role without access -> 403 | skipped | endpoint not implemented yet (not in /v3/api-docs) |
@@ -98,11 +100,11 @@ Checks 2 and 3 are skipped until the endpoint is in `/v3/api-docs` and the seede
 | POST /api/payout-batches/{id}/submit: allowed role is not rejected | skipped | endpoint not implemented yet (not in /v3/api-docs) |
 | POST /api/payout-batches/{id}/submit: a role without access -> 403 | skipped | endpoint not implemented yet (not in /v3/api-docs) |
 | GET /api/policy-rules: no token -> 401 | pass |  |
-| GET /api/policy-rules: allowed role is not rejected | skipped | no allowed demo user can log in yet (seed data, T-013) |
-| GET /api/policy-rules: a role without access -> 403 | skipped | no demo user without access can log in yet (seed data, T-013) |
+| GET /api/policy-rules: allowed role is not rejected | pass |  |
+| GET /api/policy-rules: a role without access -> 403 | pass |  |
 | PUT /api/policy-rules/{code}: no token -> 401 | pass |  |
-| PUT /api/policy-rules/{code}: allowed role is not rejected | skipped | no allowed demo user can log in yet (seed data, T-013) |
-| PUT /api/policy-rules/{code}: a role without access -> 403 | skipped | no demo user without access can log in yet (seed data, T-013) |
+| PUT /api/policy-rules/{code}: allowed role is not rejected | pass |  |
+| PUT /api/policy-rules/{code}: a role without access -> 403 | pass |  |
 | GET /api/dashboard/kpis: no token -> 401 | pass |  |
 | GET /api/dashboard/kpis: allowed role is not rejected | skipped | endpoint not implemented yet (not in /v3/api-docs) |
 | GET /api/dashboard/kpis: a role without access -> 403 | skipped | endpoint not implemented yet (not in /v3/api-docs) |
@@ -110,26 +112,26 @@ Checks 2 and 3 are skipped until the endpoint is in `/v3/api-docs` and the seede
 | POST /api/telemetry/page-load: allowed role is not rejected | skipped | endpoint not implemented yet (not in /v3/api-docs) |
 | POST /api/telemetry/page-load: a role without access -> 403 | skipped | endpoint not implemented yet (not in /v3/api-docs) |
 | GET /api/admin/users: no token -> 401 | pass |  |
-| GET /api/admin/users: allowed role is not rejected | skipped | endpoint not implemented yet (not in /v3/api-docs) |
-| GET /api/admin/users: a role without access -> 403 | skipped | endpoint not implemented yet (not in /v3/api-docs) |
+| GET /api/admin/users: allowed role is not rejected | pass |  |
+| GET /api/admin/users: a role without access -> 403 | pass |  |
 | POST /api/admin/users: no token -> 401 | pass |  |
-| POST /api/admin/users: allowed role is not rejected | skipped | endpoint not implemented yet (not in /v3/api-docs) |
-| POST /api/admin/users: a role without access -> 403 | skipped | endpoint not implemented yet (not in /v3/api-docs) |
+| POST /api/admin/users: allowed role is not rejected | pass |  |
+| POST /api/admin/users: a role without access -> 403 | KNOWN BUG | T-502: 400 instead of 403 (body validated before @PreAuthorize) |
 | PUT /api/admin/users/{id}/roles: no token -> 401 | pass |  |
-| PUT /api/admin/users/{id}/roles: allowed role is not rejected | skipped | endpoint not implemented yet (not in /v3/api-docs) |
-| PUT /api/admin/users/{id}/roles: a role without access -> 403 | skipped | endpoint not implemented yet (not in /v3/api-docs) |
+| PUT /api/admin/users/{id}/roles: allowed role is not rejected | pass |  |
+| PUT /api/admin/users/{id}/roles: a role without access -> 403 | KNOWN BUG | T-502: 400 instead of 403 (body validated before @PreAuthorize) |
 | PATCH /api/admin/users/{id}: no token -> 401 | pass |  |
-| PATCH /api/admin/users/{id}: allowed role is not rejected | skipped | endpoint not implemented yet (not in /v3/api-docs) |
-| PATCH /api/admin/users/{id}: a role without access -> 403 | skipped | endpoint not implemented yet (not in /v3/api-docs) |
+| PATCH /api/admin/users/{id}: allowed role is not rejected | pass |  |
+| PATCH /api/admin/users/{id}: a role without access -> 403 | pass |  |
 | GET /api/admin/overview: no token -> 401 | pass |  |
-| GET /api/admin/overview: allowed role is not rejected | skipped | endpoint not implemented yet (not in /v3/api-docs) |
-| GET /api/admin/overview: a role without access -> 403 | skipped | endpoint not implemented yet (not in /v3/api-docs) |
+| GET /api/admin/overview: allowed role is not rejected | pass |  |
+| GET /api/admin/overview: a role without access -> 403 | pass |  |
 | GET /api/admin/audit: no token -> 401 | pass |  |
-| GET /api/admin/audit: allowed role is not rejected | skipped | endpoint not implemented yet (not in /v3/api-docs) |
-| GET /api/admin/audit: a role without access -> 403 | skipped | endpoint not implemented yet (not in /v3/api-docs) |
+| GET /api/admin/audit: allowed role is not rejected | pass |  |
+| GET /api/admin/audit: a role without access -> 403 | pass |  |
 | GET /api/admin/health: no token -> 401 | pass |  |
-| GET /api/admin/health: allowed role is not rejected | skipped | endpoint not implemented yet (not in /v3/api-docs) |
-| GET /api/admin/health: a role without access -> 403 | skipped | endpoint not implemented yet (not in /v3/api-docs) |
+| GET /api/admin/health: allowed role is not rejected | pass |  |
+| GET /api/admin/health: a role without access -> 403 | pass |  |
 | sign-up yields EMPLOYEE only | pass |  |
 | sign-up ignores a requested staff role | pass |  |
 | employee reading another employee's claim -> 404 (no enumeration) | skipped | claims API not implemented yet (T-016) |
