@@ -44,3 +44,9 @@ Demo claims `DEMO-1001`..`DEMO-1010` are described in [docs/requirements.md](doc
 - Reusable AI asset: [docs/prompts/prompt-pack.md](docs/prompts/prompt-pack.md)
 
 _Tests, sprint reports, SRE runbook/RCA and the demo script are added during the build (T-190)._
+
+## Submission artefacts
+- Tests: [test plan](docs/testing/test-plan.md) · [test cases](docs/testing/test-cases.md) · [test results](docs/testing/test-results.md) · [defect log](docs/testing/defect-log.md) · [RBAC matrix](docs/testing/rbac-matrix.md) · E2E: [tests/e2e](tests/e2e)
+- SRE: [runbook](docs/sre/runbook.md) · [drill RCA](docs/sre/rca-drill.md) · [alerts](infra/prometheus/alerts.yml)
+- Claude usage: [CLAUDE.md](CLAUDE.md) · [prompt pack](docs/prompts/prompt-pack.md) · [journals](docs/claude-journal)
+- Sprint reviews + demo script: [docs/sprints](docs/sprints) · tracker: [squad-tracker.xlsx](docs/tracking/squad-tracker.xlsx)
