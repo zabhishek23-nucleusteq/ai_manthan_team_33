@@ -23,6 +23,7 @@ import { PayoutsPage } from './features/finance/PayoutsPage'
 import { PolicyRulesPage } from './features/finance/PolicyRulesPage'
 import { ApprovalDetailPage } from './features/staff/ApprovalDetailPage'
 import { ApprovalsInboxPage } from './features/staff/ApprovalsInboxPage'
+import { AuditQueuePage } from './features/staff/AuditQueuePage'
 import { DelegationsPage } from './features/staff/DelegationsPage'
 
 function NotFound() {
@@ -151,6 +152,16 @@ export function AppRoutes() {
         element={
           <RequireRole roles={['EMPLOYEE']}>
             <ClaimDetailPage />
+          </RequireRole>
+        }
+      />
+
+      {/* Finance auditor queue with filters, bulk approve and sample audits (T-026). */}
+      <Route
+        path="/audit-queue"
+        element={
+          <RequireRole roles={['FINANCE_AUDITOR', 'FINANCE_HEAD']}>
+            <AuditQueuePage />
           </RequireRole>
         }
       />
