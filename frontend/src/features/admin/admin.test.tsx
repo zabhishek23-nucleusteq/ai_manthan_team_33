@@ -163,6 +163,16 @@ describe('Super admin screens (T-034)', { timeout: 20_000 }, () => {
     await userEvent.click(screen.getByRole('combobox', { name: 'Filter by entity type' }))
     await userEvent.click(await screen.findByTitle('USER'))
     expect(await screen.findByText('No audit events match these filters')).toBeInTheDocument()
+    // Contract: from/to are required on /api/admin/audit (400 "from and to are required" otherwise).
+    const auditCalls = calls.filter((c) => c.url.pathname === '/api/admin/audit')
+    expect(auditCalls.length).toBeGreaterThan(0)
+    for (const c of auditCalls) {
+      const from = c.url.searchParams.get('from')
+      const to = c.url.searchParams.get('to')
+      expect(from).toBeTruthy()
+      expect(to).toBeTruthy()
+      expect(dayjs(to).diff(dayjs(from), 'day')).toBe(dayjs(rangeFor('7D').to).diff(dayjs(rangeFor('7D').from), 'day'))
+    }
   })
 
   it('health: status cards, error rate and oldest pending approval', async () => {
