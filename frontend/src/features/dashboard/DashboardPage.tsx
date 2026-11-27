@@ -88,7 +88,7 @@ export function DashboardPage({ title }: { title: string }) {
       extra={
         <Space wrap>
           {kpis.data ? <Tag aria-label="Scope">{SCOPE_LABEL[kpis.data.scope]}</Tag> : null}
-          {auth?.user ? <Typography.Text type="secondary">{auth.user.name}</Typography.Text> : null}
+          {auth?.user ? <Typography.Text type="secondary">Logged in as {auth.user.name}</Typography.Text> : null}
           {auth ? (
             <Button
               icon={<LogoutOutlined />}
