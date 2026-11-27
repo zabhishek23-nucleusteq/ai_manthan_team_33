@@ -88,10 +88,9 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(ApiError.of(ErrorCodes.RECEIPT_TOO_LARGE, "Receipts can be at most 5 MB"));
     }
 
-    /** Missing multipart file / not a multipart request / missing query parameter: client errors, not 500. */
+    /** Missing multipart file / not a multipart request: client errors, not 500 (missing query params: missingParam above). */
     @ExceptionHandler({org.springframework.web.multipart.support.MissingServletRequestPartException.class,
-            org.springframework.web.multipart.MultipartException.class,
-            org.springframework.web.bind.MissingServletRequestParameterException.class})
+            org.springframework.web.multipart.MultipartException.class})
     ResponseEntity<ApiError> missingPart(Exception ex) {
         return ResponseEntity.badRequest().body(ApiError.of(ErrorCodes.VALIDATION_FAILED,
                 "Required request part or parameter is missing (multipart field 'file' for receipts)"));
@@ -109,13 +108,6 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiError> method(org.springframework.web.HttpRequestMethodNotSupportedException ex) {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(ApiError.of(ErrorCodes.MALFORMED_REQUEST,
                 "Method " + ex.getMethod() + " is not allowed here"));
-    }
-
-    /** Wrong type in a path or query parameter (e.g. ?status=NOPE) is a client error, not a 500. */
-    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
-    ResponseEntity<ApiError> typeMismatch(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex) {
-        return ResponseEntity.badRequest().body(new ApiError(ErrorCodes.VALIDATION_FAILED, "Invalid value for " + ex.getName(),
-                Map.of("fields", Map.of(ex.getName(), "invalid value"))));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
