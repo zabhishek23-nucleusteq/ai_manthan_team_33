@@ -20,7 +20,10 @@ import { AppLayout } from './AppLayout'
 import { rolesOf, type Role } from './roles'
 import './app.css'
 
-/** Signed-in pages. Roles come from NAV_ITEMS (rbac.md §2) so menu and guard always agree. */
+/**
+ * Signed-in pages. Roles come from NAV_ITEMS (rbac.md §2) so menu and guard agree,
+ * except read-only pages that rbac.md §3 opens to more roles (see /payouts, /policy-rules).
+ */
 const PAGES: { path: string; roles: readonly Role[]; element: ReactElement }[] = [
   // Employee (T-022 / T-023, L4)
   { path: '/me/dashboard', roles: rolesOf('/me/dashboard'), element: <DashboardPage title="My dashboard" /> },

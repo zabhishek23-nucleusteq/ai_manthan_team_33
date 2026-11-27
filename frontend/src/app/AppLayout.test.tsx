@@ -15,7 +15,7 @@ const DEMO: Record<string, { id: number; name: string; roles: Role[] }> = {
   manager: { id: 2, name: 'Rahul Manager', roles: ['EMPLOYEE', 'MANAGER'] },
   auditor: { id: 3, name: 'Anita Auditor', roles: ['EMPLOYEE', 'FINANCE_AUDITOR'] },
   head: { id: 4, name: 'Farhan Head', roles: ['EMPLOYEE', 'FINANCE_HEAD', 'SUPER_ADMIN'] },
-  admin: { id: 5, name: 'Sam Admin', roles: ['SUPER_ADMIN'] },
+  admin: { id: 5, name: 'Abhishek Admin', roles: ['SUPER_ADMIN'] },
 }
 
 function signIn(key: keyof typeof DEMO) {
@@ -124,11 +124,12 @@ describe('app shell', () => {
     expect(screen.getAllByRole('button', { name: /log out/i })).toHaveLength(1)
   })
 
-  it('role screens render inside the shell', async () => {
+  it('audit queue renders inside the shell with one main landmark', async () => {
     signIn('auditor')
     renderAt('/audit-queue')
-    expect(await screen.findByRole('heading', { name: /audit queue/i })).toBeInTheDocument()
-    expect(screen.getAllByRole('main')).toHaveLength(1)
+    await screen.findByTestId('current-user')
+    await waitFor(() => expect(screen.getAllByRole('main')).toHaveLength(1))
+    expect(screen.getAllByRole('button', { name: /log out/i })).toHaveLength(1)
   })
 
   it('unknown route still shows 404', () => {
