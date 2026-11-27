@@ -77,9 +77,9 @@ test('TC-13 finance head creates a payout batch and downloads the bank CSV', asy
     await dialog.getByRole('button', { name: 'Cancel' }).click();
     await page.getByRole('button', { name: /^PB-\d+/ }).first().click();
   }
-  const drawer = page.locator('.ant-drawer-content');
-  await expect(drawer.getByText(/^Batch PB-\d+/)).toBeVisible({ timeout: 10_000 });
-  const [download] = await Promise.all([page.waitForEvent('download'), drawer.getByRole('button', { name: /Download CSV/ }).click()]);
+  // Batch drawer (antd 6 markup differs from v5, so locate by text/role rather than drawer CSS classes)
+  await expect(page.getByText(/^Batch PB-\d+$/)).toBeVisible({ timeout: 10_000 });
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: /Download CSV/ }).click()]);
   expect(download.suggestedFilename()).toMatch(/^PB-\d+\.csv$/);
 });
 
