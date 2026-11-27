@@ -92,9 +92,13 @@ class ObservabilityMetricsTest extends AbstractIntegrationTest {
         assertThat(PageLoadTelemetry.normalise("/x/3f2504e0-4f89-11d3-9a0c-0305e82c3301")).isEqualTo("/x/:id");
         assertThat(PageLoadTelemetry.normalise("javascript:alert(1)")).isEqualTo("other");
         assertThat(PageLoadTelemetry.normalise("/with space")).isEqualTo("other");
-        for (int i = 0; i < PageLoadTelemetry.MAX_ROUTES + 5; i++) {
-            telemetry.tagFor("/r" + "abcdefghijklmnopqrstuvwxyz".charAt(i % 26) + "/p" + (char) ('a' + i / 26));
+        try {
+            for (int i = 0; i < PageLoadTelemetry.MAX_ROUTES + 5; i++) {
+                telemetry.tagFor("/r" + "abcdefghijklmnopqrstuvwxyz".charAt(i % 26) + "/p" + (char) ('a' + i / 26));
+            }
+            assertThat(telemetry.tagFor("/brand-new-route")).isEqualTo("other");
+        } finally {
+            telemetry.resetKnownRoutes(); // shared bean: do not leave the cap exhausted for other test classes
         }
-        assertThat(telemetry.tagFor("/brand-new-route")).isEqualTo("other");
     }
 }

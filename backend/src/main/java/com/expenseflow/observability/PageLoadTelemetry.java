@@ -64,6 +64,11 @@ public class PageLoadTelemetry {
                 .maximumExpectedValue(Duration.ofSeconds(30)).register(registry));
     }
 
+    /** Tests only: forget the known routes (the bean is shared across test classes in one context). */
+    void resetKnownRoutes() {
+        knownRoutes.clear();
+    }
+
     String tagFor(String rawRoute) {
         String route = normalise(rawRoute);
         if (route.equals(OTHER) || knownRoutes.contains(route)) {
