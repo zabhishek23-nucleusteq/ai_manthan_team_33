@@ -1,0 +1,64 @@
+groups:
+  - name: expenseflow
+    rules:
+      - alert: ServiceDown
+        expr: up{job=~"backend|mock-bank"} == 0
+        for: 1m
+        labels: { severity: SEV1 }
+        annotations:
+          summary: "{{ $labels.job }} is down"
+          description: "Prometheus cannot scrape {{ $labels.job }} for 1 minute."
+          runbook: docs/sre/runbook.md#service-down
+
+      - alert: HighErrorRate
+        # 5xx share of requests, only when there is real traffic (> 0.05 req/s) so an idle system cannot trip it.
+        expr: |
+          sum(rate(http_server_requests_seconds_count{application="expenseflow",status=~"5.."}[5m]))
+            / sum(rate(http_server_requests_seconds_count{application="expenseflow"}[5m])) > 0.05
+          and sum(rate(http_server_requests_seconds_count{application="expenseflow"}[5m])) > 0.05
+        for: 5m
+        labels: { severity: SEV2 }
+        annotations:
+          summary: "More than 5% of API requests fail with 5xx"
+          description: "5xx ratio {{ $value | humanizePercentage }} over 5 minutes."
+          runbook: docs/sre/runbook.md#high-error-rate
+
+      - alert: BankPayoutFailures
+        # payouts_total{outcome} is incremented by the payout submit to the mock bank (BankCallMetrics).
+        expr: increase(payouts_total{application="expenseflow",outcome="failure"}[5m]) > 0
+        for: 1m
+        labels: { severity: SEV2 }
+        annotations:
+          summary: "Payout batch submits to the bank are failing"
+          description: "{{ $value | printf \"%.0f\" }} failed payout submit(s) in the last 5 minutes."
+          runbook: docs/sre/runbook.md#bank-payout-failures
+
+      - alert: BankCallLatencyHigh
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(external_call_seconds_bucket{application="expenseflow",target="bank"}[5m]))) > 2
+        for: 5m
+        labels: { severity: SEV3 }
+        annotations:
+          summary: "Bank call latency p95 above 2 s"
+          description: "p95 {{ $value | printf \"%.2f\" }} s over 5 minutes."
+          runbook: docs/sre/runbook.md#bank-payout-failures
+
+      - alert: OldestPendingApprovalTooOld
+        # Seeded demo history already has approvals pending 4-5 days, so this fires on a freshly seeded stack:
+        # see runbook (expected on seed data; clear by approving the oldest items or re-seeding).
+        expr: max(approval_oldest_pending_age_seconds{application="expenseflow"}) > 48 * 3600
+        for: 5m
+        labels: { severity: SEV2 }
+        annotations:
+          summary: "An approval has been pending for more than 48 hours"
+          description: "Oldest pending approval is {{ $value | humanizeDuration }} old."
+          runbook: docs/sre/runbook.md#oldest-pending-approval
+
+      - alert: ApprovalQueueGrowing
+        expr: sum(approval_queue_size{application="expenseflow"}) > 1000
+        for: 15m
+        labels: { severity: SEV3 }
+        annotations:
+          summary: "More than 1000 claims waiting for approval"
+          description: "Queue size {{ $value }}."
+          runbook: docs/sre/runbook.md#approval-queue
