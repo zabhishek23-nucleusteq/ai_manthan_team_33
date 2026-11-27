@@ -10,7 +10,7 @@ describe('theme', () => {
   it('defines brand tokens for light mode', () => {
     const cfg = getThemeConfig('light')
     expect(cfg.token?.colorPrimary).toBe(brandTokens.colorPrimary)
-    expect(cfg.token?.borderRadius).toBe(8)
+    expect(cfg.token?.borderRadius).toBe(6) // docs/ux/design-tokens.md
     expect(cfg.token?.fontSize).toBe(14)
   })
 
