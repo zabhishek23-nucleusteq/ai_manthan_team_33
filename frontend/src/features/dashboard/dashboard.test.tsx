@@ -67,7 +67,7 @@ describe('role dashboard', () => {
     expect(screen.getByTestId('kpi-pending')).toHaveTextContent('1')
     expect(screen.getByTestId('kpi-violations')).toHaveTextContent('3')
     expect(screen.getByTestId('kpi-approval-hours')).toHaveTextContent('17 h')
-    expect(screen.getByRole('list', { name: 'Spend by category' })).toHaveTextContent('HOTEL')
+    expect(screen.getByRole('list', { name: 'Spend by category' })).toHaveTextContent('Hotel') // plain-words category label
     expect(screen.queryByText('Spend by department')).toBeNull() // OWN scope
     await waitFor(() =>
       expect(post).toHaveBeenCalledWith('/api/telemetry/page-load', expect.objectContaining({ route: '/me/dashboard' })),
