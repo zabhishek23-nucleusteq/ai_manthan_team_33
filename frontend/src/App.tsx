@@ -12,6 +12,7 @@ import { useAuth } from './features/auth/authContext'
 import { ForbiddenPage } from './features/auth/ForbiddenPage'
 import { RequireRole } from './features/auth/guards'
 import { LandingPlaceholder } from './features/auth/LandingPlaceholder'
+import { DashboardPage } from './features/dashboard/DashboardPage'
 import { LoginPage } from './features/auth/LoginPage'
 import { landingRouteFor } from './features/auth/roles'
 import { SignupPage } from './features/auth/SignupPage'
@@ -54,7 +55,7 @@ export function AppRoutes() {
         path="/me/dashboard"
         element={
           <RequireRole roles={['EMPLOYEE']}>
-            <LandingPlaceholder title="My dashboard" />
+            <DashboardPage title="My dashboard" />
           </RequireRole>
         }
       />
@@ -62,7 +63,7 @@ export function AppRoutes() {
         path="/manager/dashboard"
         element={
           <RequireRole roles={['MANAGER']}>
-            <LandingPlaceholder title="Team dashboard" />
+            <DashboardPage title="Team dashboard" />
           </RequireRole>
         }
       />
@@ -70,7 +71,7 @@ export function AppRoutes() {
         path="/finance/dashboard"
         element={
           <RequireRole roles={['FINANCE_AUDITOR', 'FINANCE_HEAD']}>
-            <LandingPlaceholder title="Finance dashboard" />
+            <DashboardPage title="Finance dashboard" />
           </RequireRole>
         }
       />
