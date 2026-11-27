@@ -26,6 +26,8 @@ jobs:
           java-version: '17'
           cache: maven
       - run: chmod +x mvnw
+      - name: Fetch Maven (retry, the download is occasionally flaky)
+        run: for i in 1 2 3 4 5; do ./mvnw -B -v && exit 0; sleep 10; done; exit 1
       - run: ./mvnw -B verify
 
   mock-bank:
@@ -41,6 +43,8 @@ jobs:
           java-version: '17'
           cache: maven
       - run: chmod +x mvnw
+      - name: Fetch Maven (retry, the download is occasionally flaky)
+        run: for i in 1 2 3 4 5; do ./mvnw -B -v && exit 0; sleep 10; done; exit 1
       - run: ./mvnw -B verify
 
   frontend:
