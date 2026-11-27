@@ -27,6 +27,8 @@ jobs:
           cache: maven
       - run: chmod +x mvnw
       - run: ./mvnw -B verify
+        env:
+          MVNW_VERBOSE: 'true'
 
   mock-bank:
     runs-on: ubuntu-latest
