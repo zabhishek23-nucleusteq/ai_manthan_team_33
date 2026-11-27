@@ -1,33 +1,12 @@
 /**
- * Roles, menu and landing routes - mirrors docs/architecture/rbac.md §1-§2 (source of truth).
+ * Menu per role - mirrors docs/architecture/rbac.md §2 (source of truth).
+ * Role type, landing priority and labels live in features/auth/roles.ts (L4); this file adds the menu.
  * Backend is the authority; this only hides menu items and guards routes.
  */
-export type Role = 'EMPLOYEE' | 'MANAGER' | 'FINANCE_AUDITOR' | 'FINANCE_HEAD' | 'SUPER_ADMIN'
+import { hasAnyRole, ROLE_PRIORITY } from '../features/auth/roles'
+import type { Role } from '../features/auth/types'
 
-/** Highest first: decides the landing dashboard for users with several roles. */
-export const ROLE_PRIORITY: readonly Role[] = [
-  'SUPER_ADMIN',
-  'FINANCE_HEAD',
-  'FINANCE_AUDITOR',
-  'MANAGER',
-  'EMPLOYEE',
-]
-
-export const ROLE_LABEL: Record<Role, string> = {
-  EMPLOYEE: 'Employee',
-  MANAGER: 'Manager',
-  FINANCE_AUDITOR: 'Finance auditor',
-  FINANCE_HEAD: 'Finance head',
-  SUPER_ADMIN: 'Super admin',
-}
-
-export const LANDING_ROUTE: Record<Role, string> = {
-  SUPER_ADMIN: '/admin',
-  FINANCE_HEAD: '/finance/dashboard',
-  FINANCE_AUDITOR: '/finance/dashboard',
-  MANAGER: '/manager/dashboard',
-  EMPLOYEE: '/me/dashboard',
-}
+export type { Role }
 
 export type NavGroup = 'My expenses' | 'Approvals' | 'Finance' | 'Administration'
 
@@ -59,23 +38,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { path: '/admin/health', label: 'System health', group: 'Administration', roles: ['SUPER_ADMIN'] },
 ]
 
-export function hasAnyRole(userRoles: readonly Role[], allowed: readonly Role[]): boolean {
-  return allowed.some((r) => userRoles.includes(r))
-}
-
 /** Union of the menus of all the user's roles, in display order. */
 export function menuForRoles(roles: readonly Role[]): NavItem[] {
   return NAV_ITEMS.filter((item) => hasAnyRole(roles, item.roles))
 }
 
-/** Highest role wins (rbac.md §2). No known role -> null (caller shows 403). */
+/** Highest role (rbac.md §2 priority) or null. */
 export function primaryRole(roles: readonly Role[]): Role | null {
   return ROLE_PRIORITY.find((r) => roles.includes(r)) ?? null
-}
-
-export function landingRoute(roles: readonly Role[]): string | null {
-  const role = primaryRole(roles)
-  return role ? LANDING_ROUTE[role] : null
 }
 
 /** Menu key to highlight: the longest menu path that prefixes the current path. */
@@ -85,7 +55,9 @@ export function selectedMenuKey(pathname: string, items: readonly NavItem[]): st
     .sort((a, b) => b.path.length - a.path.length)[0]?.path
 }
 
-/** Keeps only names we know, so a stray claim from the token cannot widen the menu. */
-export function toRoles(names: readonly string[]): Role[] {
-  return names.filter((n): n is Role => (ROLE_PRIORITY as readonly string[]).includes(n))
+/** Roles of a nav path (route table uses this so menu and guard never disagree). */
+export function rolesOf(path: string): readonly Role[] {
+  const item = NAV_ITEMS.find((i) => i.path === path)
+  if (!item) throw new Error(`No nav item for ${path}`)
+  return item.roles
 }

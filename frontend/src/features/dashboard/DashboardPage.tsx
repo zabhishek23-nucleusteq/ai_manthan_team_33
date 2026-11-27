@@ -1,10 +1,8 @@
-import { LogoutOutlined } from '@ant-design/icons'
-import { Alert, Button, Card, Col, Row, Space, Statistic, Tag, Typography } from 'antd'
+import { Alert, Button, Card, Col, Row, Statistic, Tag } from 'antd'
 import dayjs from 'dayjs'
-import { useContext, useEffect, useMemo, useRef } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useEffect, useMemo, useRef } from 'react'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { PageEmpty, PageLoading } from '../../components/PageState'
-import { AuthContext } from '../auth/authContext'
 import { CustomerPage } from '../customer/CustomerPage'
 import { BarList } from './BarList'
 import { DateRangeFilter } from './DateRangeFilter'
@@ -33,8 +31,6 @@ function widen(range: DateRange): DateRange {
 export function DashboardPage({ title }: { title: string }) {
   const [params, setParams] = useSearchParams()
   const location = useLocation()
-  const navigate = useNavigate()
-  const auth = useContext(AuthContext) // optional: the page also renders outside AuthProvider (tests)
   const paramKey = params.toString()
   const range = useMemo(() => rangeFromParams(new URLSearchParams(paramKey)), [paramKey])
   const kpis = useKpis(range)
@@ -85,23 +81,7 @@ export function DashboardPage({ title }: { title: string }) {
   return (
     <CustomerPage
       title={title}
-      extra={
-        <Space wrap>
-          {kpis.data ? <Tag aria-label="Scope">{SCOPE_LABEL[kpis.data.scope]}</Tag> : null}
-          {auth?.user ? <Typography.Text type="secondary">Logged in as {auth.user.name}</Typography.Text> : null}
-          {auth ? (
-            <Button
-              icon={<LogoutOutlined />}
-              onClick={() => {
-                auth.logout()
-                navigate('/login', { replace: true })
-              }}
-            >
-              Log out
-            </Button>
-          ) : null}
-        </Space>
-      }
+      extra={kpis.data ? <Tag aria-label="Scope">{SCOPE_LABEL[kpis.data.scope]}</Tag> : null}
     >
       <DateRangeFilter value={range} onChange={setRange} />
       <div aria-busy={kpis.isFetching} aria-live="polite">

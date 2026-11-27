@@ -19,8 +19,9 @@ import { Button, Drawer, Grid, Layout, Menu, Tag, Tooltip, Typography, theme, ty
 import { useMemo, useState, type ReactNode } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useThemeMode } from '../design/themeModeContext'
-import { menuForRoles, primaryRole, ROLE_LABEL, ROLE_PRIORITY, selectedMenuKey, type NavItem } from './roles'
-import { useSession } from './session'
+import { useAuth } from '../features/auth/authContext'
+import { ROLE_LABEL, ROLE_PRIORITY } from '../features/auth/roles'
+import { menuForRoles, primaryRole, selectedMenuKey, type NavItem } from './roles'
 
 const ICONS: Record<string, ReactNode> = {
   '/me/dashboard': <DashboardOutlined />,
@@ -53,7 +54,7 @@ export function toMenuItems(items: readonly NavItem[]): MenuProps['items'] {
 
 /** Staff + employee shell: header (user, roles, theme, logout) and role-filtered menu (drawer below lg). */
 export function AppLayout() {
-  const { user, logout } = useSession()
+  const { user, roles, logout } = useAuth()
   const { mode, toggle } = useThemeMode()
   const screens = Grid.useBreakpoint()
   const isDesktop = !!screens.lg
@@ -62,7 +63,6 @@ export function AppLayout() {
   const location = useLocation()
   const { token } = theme.useToken()
 
-  const roles = useMemo(() => user?.roles ?? [], [user])
   const nav = useMemo(() => menuForRoles(roles), [roles])
   const selected = selectedMenuKey(location.pathname, nav)
   const sortedRoles = ROLE_PRIORITY.filter((r) => roles.includes(r))
@@ -160,14 +160,10 @@ export function AppLayout() {
             {menu}
           </Drawer>
         )}
-        <Layout.Content
-          id="main-content"
-          tabIndex={-1}
-          role="main"
-          style={{ padding: isDesktop ? 24 : 16, outline: 'none', minWidth: 0 }}
-        >
+        {/* Plain div: each page renders its own <main> landmark (CustomerPage, AdminShell, DashboardPage, staff pages). */}
+        <div id="main-content" tabIndex={-1} style={{ flex: 1, padding: isDesktop ? 24 : 16, outline: 'none', minWidth: 0 }}>
           <Outlet />
-        </Layout.Content>
+        </div>
       </Layout>
     </Layout>
   )

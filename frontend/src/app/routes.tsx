@@ -1,60 +1,73 @@
 import { Result } from 'antd'
 import type { ReactElement } from 'react'
 import { Route } from 'react-router-dom'
-import { DASHBOARDS, RoleDashboard } from '../features/dashboard/RoleDashboard'
+import { AdminAuditPage } from '../features/admin/AdminAuditPage'
+import { AdminHealthPage } from '../features/admin/AdminHealthPage'
+import { AdminOverviewPage } from '../features/admin/AdminOverviewPage'
+import { AdminUsersPage } from '../features/admin/AdminUsersPage'
+import { RequireAuth, RequireRole } from '../features/auth/guards'
+import { ClaimDetailPage } from '../features/customer/ClaimDetailPage'
+import { ClaimEditorPage } from '../features/customer/ClaimEditorPage'
+import { ClaimOutcomePage } from '../features/customer/ClaimOutcomePage'
+import { ClaimsListPage } from '../features/customer/ClaimsListPage'
+import { DashboardPage } from '../features/dashboard/DashboardPage'
+import { PayoutsPage } from '../features/finance/PayoutsPage'
+import { PolicyRulesPage } from '../features/finance/PolicyRulesPage'
+import { ApprovalDetailPage } from '../features/staff/ApprovalDetailPage'
+import { ApprovalsInboxPage } from '../features/staff/ApprovalsInboxPage'
+import { DelegationsPage } from '../features/staff/DelegationsPage'
 import { AppLayout } from './AppLayout'
-import { DemoLogin } from './DemoLogin'
-import { LandingRedirect, LOGIN_ROUTE, RequireAuth, RequireRole } from './guards'
-import { NAV_ITEMS, type Role } from './roles'
+import { rolesOf, type Role } from './roles'
 import './app.css'
 
 function ComingSoon({ title, task }: { title: string; task: string }) {
-  return <Result status="info" title={title} subTitle={`This screen is being built (${task}).`} />
+  return (
+    <main>
+      <Result status="info" title={title} subTitle={`This screen is being built (${task}).`} />
+    </main>
+  )
 }
 
-const rolesOf = (path: string): readonly Role[] => {
-  const item = NAV_ITEMS.find((i) => i.path === path)
-  if (!item) throw new Error(`No nav item for ${path}`)
-  return item.roles
-}
-
-/** Route table for signed-in pages. Roles come from NAV_ITEMS (rbac.md §2). */
+/** Signed-in pages. Roles come from NAV_ITEMS (rbac.md §2) so menu and guard always agree. */
 const PAGES: { path: string; roles: readonly Role[]; element: ReactElement }[] = [
-  { path: '/me/dashboard', roles: rolesOf('/me/dashboard'), element: <RoleDashboard def={DASHBOARDS.employee} /> },
-  { path: '/claims', roles: rolesOf('/claims'), element: <ComingSoon title="My claims" task="T-022" /> },
-  { path: '/claims/new', roles: rolesOf('/claims/new'), element: <ComingSoon title="New claim" task="T-022" /> },
-  { path: '/claims/:id', roles: rolesOf('/claims'), element: <ComingSoon title="Claim detail" task="T-023" /> },
-  { path: '/manager/dashboard', roles: rolesOf('/manager/dashboard'), element: <RoleDashboard def={DASHBOARDS.manager} /> },
-  { path: '/approvals', roles: rolesOf('/approvals'), element: <ComingSoon title="Approvals" task="T-025" /> },
-  { path: '/approvals/:claimId', roles: rolesOf('/approvals'), element: <ComingSoon title="Claim review" task="T-025" /> },
-  { path: '/delegations', roles: rolesOf('/delegations'), element: <ComingSoon title="Delegation" task="T-025" /> },
-  { path: '/finance/dashboard', roles: rolesOf('/finance/dashboard'), element: <RoleDashboard def={DASHBOARDS.finance} /> },
+  // Employee (T-022 / T-023, L4)
+  { path: '/me/dashboard', roles: rolesOf('/me/dashboard'), element: <DashboardPage title="My dashboard" /> },
+  { path: '/claims', roles: rolesOf('/claims'), element: <ClaimsListPage /> },
+  { path: '/claims/new', roles: rolesOf('/claims/new'), element: <ClaimEditorPage /> },
+  { path: '/claims/:id/edit', roles: rolesOf('/claims'), element: <ClaimEditorPage /> },
+  { path: '/claims/:id/submitted', roles: rolesOf('/claims'), element: <ClaimOutcomePage /> },
+  { path: '/claims/:id', roles: rolesOf('/claims'), element: <ClaimDetailPage /> },
+  // Approvers
+  { path: '/manager/dashboard', roles: rolesOf('/manager/dashboard'), element: <DashboardPage title="Team dashboard" /> },
+  { path: '/approvals', roles: rolesOf('/approvals'), element: <ApprovalsInboxPage /> },
+  { path: '/approvals/:claimId', roles: rolesOf('/approvals'), element: <ApprovalDetailPage /> },
+  { path: '/delegations', roles: rolesOf('/delegations'), element: <DelegationsPage /> },
+  // Finance
+  { path: '/finance/dashboard', roles: rolesOf('/finance/dashboard'), element: <DashboardPage title="Finance dashboard" /> },
   { path: '/audit-queue', roles: rolesOf('/audit-queue'), element: <ComingSoon title="Audit queue" task="T-026" /> },
-  { path: '/payouts', roles: rolesOf('/payouts'), element: <ComingSoon title="Payouts" task="T-031" /> },
-  { path: '/policy-rules', roles: rolesOf('/policy-rules'), element: <ComingSoon title="Policy rules" task="T-031" /> },
-  { path: '/admin', roles: rolesOf('/admin'), element: <RoleDashboard def={DASHBOARDS.admin} /> },
-  { path: '/admin/users', roles: rolesOf('/admin/users'), element: <ComingSoon title="Users" task="T-034" /> },
-  { path: '/admin/audit', roles: rolesOf('/admin/audit'), element: <ComingSoon title="Audit log" task="T-034" /> },
-  { path: '/admin/health', roles: rolesOf('/admin/health'), element: <ComingSoon title="System health" task="T-034" /> },
+  // Read access per rbac.md §3 (T-031): auditor views batches; MGR/AUD/ADMIN view rules. Menu stays per §2.
+  { path: '/payouts', roles: ['FINANCE_AUDITOR', 'FINANCE_HEAD'], element: <PayoutsPage /> },
+  { path: '/policy-rules', roles: ['MANAGER', 'FINANCE_AUDITOR', 'FINANCE_HEAD', 'SUPER_ADMIN'], element: <PolicyRulesPage /> },
+  // Super admin (T-034)
+  { path: '/admin', roles: rolesOf('/admin'), element: <AdminOverviewPage /> },
+  { path: '/admin/users', roles: rolesOf('/admin/users'), element: <AdminUsersPage /> },
+  { path: '/admin/audit', roles: rolesOf('/admin/audit'), element: <AdminAuditPage /> },
+  { path: '/admin/health', roles: rolesOf('/admin/health'), element: <AdminHealthPage /> },
 ]
 
-/** Fragment of <Route>s to place inside the app's <Routes>. */
+/** Fragment of <Route>s to place inside the app's <Routes>: the shell wraps every signed-in page. */
 export function appRoutes() {
   return (
-    <>
-      <Route path={LOGIN_ROUTE} element={<DemoLogin />} />
-      <Route
-        element={
-          <RequireAuth>
-            <AppLayout />
-          </RequireAuth>
-        }
-      >
-        <Route index element={<LandingRedirect />} />
-        {PAGES.map((p) => (
-          <Route key={p.path} path={p.path} element={<RequireRole roles={p.roles}>{p.element}</RequireRole>} />
-        ))}
-      </Route>
-    </>
+    <Route
+      element={
+        <RequireAuth>
+          <AppLayout />
+        </RequireAuth>
+      }
+    >
+      {PAGES.map((p) => (
+        <Route key={p.path} path={p.path} element={<RequireRole roles={p.roles}>{p.element}</RequireRole>} />
+      ))}
+    </Route>
   )
 }

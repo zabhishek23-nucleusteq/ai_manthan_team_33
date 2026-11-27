@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { landingRoute, menuForRoles, primaryRole, selectedMenuKey, toRoles, type Role } from './roles'
+import { landingRouteFor } from '../features/auth/roles'
+import { menuForRoles, primaryRole, selectedMenuKey, type Role } from './roles'
 
 const labels = (roles: Role[]) => menuForRoles(roles).map((i) => i.label)
 
@@ -79,11 +80,11 @@ describe('landing route per role', () => {
     [['EMPLOYEE', 'FINANCE_HEAD', 'SUPER_ADMIN'], '/admin'],
     [['SUPER_ADMIN'], '/admin'],
   ])('%j -> %s', (roles, route) => {
-    expect(landingRoute(roles)).toBe(route)
+    expect(landingRouteFor(roles)).toBe(route)
   })
 
-  it('no known role -> null', () => {
-    expect(landingRoute([])).toBeNull()
+  it('no known role -> 403 page', () => {
+    expect(landingRouteFor([])).toBe('/403')
     expect(primaryRole([])).toBeNull()
   })
 })
@@ -96,9 +97,5 @@ describe('helpers', () => {
     expect(selectedMenuKey('/admin/users', nav)).toBe('/admin/users')
     expect(selectedMenuKey('/admin', nav)).toBe('/admin')
     expect(selectedMenuKey('/administrator', nav)).toBeUndefined()
-  })
-
-  it('drops unknown role names', () => {
-    expect(toRoles(['EMPLOYEE', 'ROOT', 'MANAGER'])).toEqual(['EMPLOYEE', 'MANAGER'])
   })
 })
