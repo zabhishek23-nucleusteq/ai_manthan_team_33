@@ -68,6 +68,12 @@
 			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
 			<version>${springdoc.version}</version>
 		</dependency>
+		<dependency>
+			<!-- synthetic seed data (profile "seed", T-013) -->
+			<groupId>net.datafaker</groupId>
+			<artifactId>datafaker</artifactId>
+			<version>2.7.0</version>
+		</dependency>
 
 		<dependency>
 			<groupId>io.micrometer</groupId>
