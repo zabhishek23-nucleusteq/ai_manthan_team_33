@@ -69,7 +69,6 @@ jobs:
       - run: npm run build
 
   dependency-check:
-    # Maven dependency scan (OSV/Trivy) not enabled: both failed on the runner; tracked as follow-up.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -79,6 +78,23 @@ jobs:
       - name: npm audit (frontend, production deps)
         working-directory: frontend
         run: npm audit --omit=dev --audit-level=high
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: SBOM for Maven modules (CycloneDX)
+        env:
+          MVNW_REPOURL: https://repo1.maven.org/maven2
+        run: |
+          for m in backend services/mock-bank; do
+            (cd $m && chmod +x mvnw && ./mvnw -B -q org.cyclonedx:cyclonedx-maven-plugin:2.9.1:makeAggregateBom -DoutputFormat=json -DoutputName=bom)
+          done
+      - name: OSV scan of Maven dependencies (fails on known vulnerabilities)
+        run: |
+          curl -sSfL -o osv-scanner https://github.com/google/osv-scanner/releases/download/v2.0.2/osv-scanner_linux_amd64
+          chmod +x osv-scanner
+          ./osv-scanner scan --sbom backend/target/bom.json --sbom services/mock-bank/target/bom.json
 
   images:
     runs-on: ubuntu-latest
