@@ -88,8 +88,7 @@ const ENDPOINTS: Endpoint[] = [
 // Known backend defects. These checks are expected to fail (test.fail): when the bug is fixed they start
 // "unexpectedly passing", which fails CI and tells us to delete the entry. Key: "METHOD contract-path".
 const KNOWN_BUGS: Record<string, string> = {
-  'POST /api/admin/users': 'T-502: 400 instead of 403 (body validated before @PreAuthorize)',
-  'PUT /api/admin/users/{id}/roles': 'T-502: 400 instead of 403 (body validated before @PreAuthorize)',
+  // e.g. 'POST /api/x': 'T-5xx: reason'. T-502 (admin 400 vs 403) was fixed, entries removed.
 };
 
 const norm = (p: string) => p.replace(/\{[^}]+\}/g, '{}');
