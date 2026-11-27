@@ -42,6 +42,11 @@ public class ApprovalQueueMetrics {
                     .description("Approval steps waiting for a decision").tag("level", level).register(registry);
             Gauge.builder("expenseflow.oldest.pending.approval.seconds", this, m -> m.stats(level).oldestSeconds())
                     .description("Age of the oldest undecided approval step").tag("level", level).register(registry);
+            // Same values under the names the Grafana dashboard and alerts query (docs/sre/sre-handbook.md s2)
+            Gauge.builder("approval.queue.size", this, m -> m.stats(level).size())
+                    .description("Claims pending per approval level").tag("level", level).register(registry);
+            Gauge.builder("approval.oldest.pending.age.seconds", this, m -> m.stats(level).oldestSeconds())
+                    .description("Age of the oldest pending approval").tag("level", level).register(registry);
         }
     }
 
