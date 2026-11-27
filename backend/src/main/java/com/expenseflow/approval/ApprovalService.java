@@ -8,6 +8,7 @@ import com.expenseflow.domain.ApprovalStep;
 import com.expenseflow.domain.AuditActions;
 import com.expenseflow.domain.Claim;
 import com.expenseflow.domain.ClaimStatus;
+import com.expenseflow.domain.Role;
 import com.expenseflow.domain.User;
 import com.expenseflow.policy.PolicyModel.PolicyResult;
 import com.expenseflow.policy.PolicyService;
@@ -117,20 +118,24 @@ public class ApprovalService {
         if (c.isOwnedBy(actorId)) {
             throw new ApiException(HttpStatus.FORBIDDEN, ErrorCodes.SELF_APPROVAL_FORBIDDEN, "You cannot decide on your own claim", null);
         }
+        User actor = users.findById(actorId).orElseThrow(() -> ApiException.notFound(ErrorCodes.NOT_FOUND, "User not found"));
         ApprovalStep step = steps.findFirstByClaimIdAndDecisionIsNull(claimId).orElse(null);
         User assignee = step == null ? null : step.getAssignee();
         boolean isAssignee = assignee != null && assignee.getId().equals(actorId);
-        boolean isDelegate = assignee != null && !isAssignee
-                && directory.activeDelegate(assignee.getId()).map(d -> d.getId().equals(actorId)).orElse(false);
+        // AUDITOR level is a finance team pool: any FINANCE_AUDITOR (never the claimant, checked above) may act;
+        // the decision is recorded on behalf of the assigned auditor (ADR-001 amendment, T-190)
+        boolean isPoolAuditor = assignee != null && !isAssignee && step.getLevel() == ApprovalLevel.AUDITOR
+                && actor.hasRole(Role.FINANCE_AUDITOR);
+        boolean isDelegate = assignee != null && !isAssignee && (isPoolAuditor
+                || directory.activeDelegate(assignee.getId()).map(d -> d.getId().equals(actorId)).orElse(false));
         if (step == null || c.getStatus() != pendingStatus(step.getLevel())) {
-            if (steps.isApproverOf(claimId, actorId)) {
+            if (steps.isApproverOf(claimId, actorId) || isPoolAuditor || actor.hasRole(Role.FINANCE_AUDITOR)) {
                 throw ApiException.conflict(ErrorCodes.ILLEGAL_STATE_TRANSITION, "Claim is " + c.getStatus() + " and has no open step for you");
             }
             throw notAssigned();
         }
         if (!isAssignee && !isDelegate) throw notAssigned();
 
-        User actor = users.findById(actorId).orElseThrow(() -> ApiException.notFound(ErrorCodes.NOT_FOUND, "User not found"));
         Instant now = Instant.now();
         ClaimStatus before = c.getStatus();
         step.decide(decision, actor, isDelegate ? assignee : null, comment, now);
@@ -192,6 +197,14 @@ public class ApprovalService {
         for (ApprovalStep s : steps.findByAssigneeIdAndDecisionIsNull(userId)) out.add(new InboxItem(s, null));
         for (Long delegator : directory.delegatorsOf(userId)) {
             for (ApprovalStep s : steps.findByAssigneeIdAndDecisionIsNull(delegator)) out.add(new InboxItem(s, s.getAssignee()));
+        }
+        // finance auditors share the AUDITOR level as a team pool (see decide)
+        if (users.findById(userId).map(u -> u.hasRole(Role.FINANCE_AUDITOR)).orElse(false)) {
+            Set<Long> seen = new HashSet<>();
+            out.forEach(i -> seen.add(i.step().getId()));
+            for (ApprovalStep s : directory.openAuditorSteps()) {
+                if (seen.add(s.getId())) out.add(new InboxItem(s, s.getAssignee()));
+            }
         }
         out.removeIf(i -> i.step().getClaim().isOwnedBy(userId)
                 || i.step().getClaim().getStatus() != pendingStatus(i.step().getLevel()));

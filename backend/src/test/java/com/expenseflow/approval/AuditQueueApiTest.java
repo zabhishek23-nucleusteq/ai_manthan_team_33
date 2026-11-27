@@ -130,8 +130,8 @@ class AuditQueueApiTest extends AbstractIntegrationTest {
     @Test
     void queue_filters() throws Exception {
         JsonNode all = queue("");
-        assertThat(all.get("total").asLong()).isEqualTo(3);                 // q1, q2, q4 - not q3 (other auditor), not own
-        assertThat(ids(all)).isEqualTo(q1 + "," + q4 + "," + q2 + ",");      // default: oldest submitted first
+        assertThat(all.get("total").asLong()).isEqualTo(4);                 // q1..q4 (AUDITOR level is a team pool, T-190), not own
+        assertThat(ids(all)).isEqualTo(q1 + "," + q4 + "," + q3 + "," + q2 + ",");      // default: oldest submitted first
         assertThat(all.at("/items/0/level").asString()).isEqualTo("AUDITOR");
         assertThat(all.at("/items/1/sampleAudit").asBoolean()).isTrue();
 
@@ -141,7 +141,7 @@ class AuditQueueApiTest extends AbstractIntegrationTest {
         assertThat(ids(queue("&category=CAB"))).isEqualTo(q2 + ",");
         assertThat(ids(queue("&sampleOnly=true"))).isEqualTo(q4 + ",");
         assertThat(ids(queue("&olderThanHours=48"))).isEqualTo(q1 + ",");
-        assertThat(ids(queue("&sort=-total"))).isEqualTo(q2 + "," + q1 + "," + q4 + ",");
+        assertThat(ids(queue("&sort=-total"))).isEqualTo(q2 + "," + q3 + "," + q1 + "," + q4 + ",");
         assertThat(queue("&size=1&page=1").get("items").size()).isEqualTo(1);
         assertThat(send("GET", "/api/audit-queue?sort=bogus", auditor, null).statusCode()).isEqualTo(400);
     }
@@ -155,10 +155,10 @@ class AuditQueueApiTest extends AbstractIntegrationTest {
         assertThat(r.size()).isEqualTo(3);                                    // duplicate id collapsed
         assertThat(r.get(0).get("ok").asBoolean()).isTrue();
         assertThat(r.get(0).get("status").asString()).isEqualTo("APPROVED");
-        assertThat(r.get(1).get("code").asString()).isEqualTo("NOT_ASSIGNED_APPROVER");
+        assertThat(r.get(1).get("ok").asBoolean()).as("q3: any auditor may act at AUDITOR level (team pool)").isTrue();
         assertThat(r.get(2).get("code").asString()).isEqualTo("NOT_FOUND");
         assertThat(jdbc.queryForObject("select status from claims where id = ?", String.class, q1)).isEqualTo("APPROVED");
-        assertThat(jdbc.queryForObject("select status from claims where id = ?", String.class, q3)).isEqualTo("PENDING_AUDITOR");
+        assertThat(jdbc.queryForObject("select status from claims where id = ?", String.class, q3)).isEqualTo("APPROVED");
         assertThat(jdbc.queryForObject("select count(*) from audit_events where entity_type = 'CLAIM' and entity_id = ?"
                 + " and action = 'CLAIM_APPROVED'", Long.class, String.valueOf(q1))).isEqualTo(1);
 

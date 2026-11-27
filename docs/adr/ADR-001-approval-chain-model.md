@@ -33,3 +33,6 @@ Delegations created later also re-assign open steps of the delegator (FR-8).
 - Every decision is a row -> audit timeline and BR-19 approval time are simple queries.
 - Resubmit after send-back closes all open steps (`decision = SUPERSEDED`) and restarts at MANAGER.
 - Residual risk: splitting a claim into several smaller claims to stay under 25,000 is not blocked by the chain itself (thresholds are per claim, as the statement defines). Mitigation: daily meal sum across claims, duplicate rules, and auditor queue filters; a future rule "sum per employee per 7 days" can be added as a `policy_rules` row.
+
+## Amendment (T-190 integration, demo day)
+The AUDITOR level is a **finance team pool**: the step is still assigned to the least-loaded auditor, but any FINANCE_AUDITOR (never the claimant) may decide it. The decision records `actedBy` = the acting auditor and `onBehalfOf` = the assigned auditor (step and audit event), exactly like a delegation. Reason: the auditor queue (FR-9) is a shared team queue; with strict assignment a claim was invisible to every auditor but one. MANAGER and HEAD levels stay strictly assigned.
