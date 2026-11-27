@@ -5,11 +5,13 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -34,6 +36,19 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ResponseEntity<ApiError> unreadable(HttpMessageNotReadableException ex) {
         return ResponseEntity.badRequest().body(ApiError.of("MALFORMED_REQUEST", "Request body could not be read"));
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    ResponseEntity<ApiError> missingHeader(MissingRequestHeaderException ex) {
+        return ResponseEntity.badRequest().body(new ApiError(ErrorCodes.VALIDATION_FAILED,
+                "Required header " + ex.getHeaderName() + " is missing", Map.of("header", ex.getHeaderName())));
+    }
+
+    /** NFR-CONC: a stale @Version (two approvers, two tabs) is a 409 the client can recover from by reloading. */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    ResponseEntity<ApiError> concurrent(OptimisticLockingFailureException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiError.of(ErrorCodes.CONCURRENT_MODIFICATION,
+                "Someone else changed this record. Reload and try again."));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
