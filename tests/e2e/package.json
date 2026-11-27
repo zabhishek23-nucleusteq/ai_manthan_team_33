@@ -5,11 +5,14 @@
   "type": "module",
   "scripts": {
     "test:api": "playwright test --project=api",
+    "test:ui": "playwright test --project=ui --project=ui-mobile",
     "rbac:summary": "node scripts/rbac-summary.mjs"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.1",
     "@playwright/test": "^1.60.0",
     "@types/node": "^26.6.6",
     "typescript": "~7.0.2"
   }
 }
+
