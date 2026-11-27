@@ -54,6 +54,8 @@ public class SecurityConfig {
                 // answer 400 (rbac.md section 3: claims/receipts = EMP, MGR, AUD, HEAD)
                 .requestMatchers("/api/claims", "/api/claims/**", "/api/receipts", "/api/receipts/**")
                     .hasAnyRole("EMPLOYEE", "MANAGER", "FINANCE_AUDITOR", "FINANCE_HEAD")
+                // same reason for the super admin API (rbac.md: /api/admin/** = SUPER_ADMIN only); main's e2e-api was red on it
+                .requestMatchers("/api/admin/**").hasRole("SUPER_ADMIN")
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e
                 .authenticationEntryPoint(JsonSecurityErrorHandlers.entryPoint())

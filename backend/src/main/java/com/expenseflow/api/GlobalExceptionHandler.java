@@ -88,6 +88,29 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(ApiError.of(ErrorCodes.RECEIPT_TOO_LARGE, "Receipts can be at most 5 MB"));
     }
 
+    /** Missing multipart file / not a multipart request / missing query parameter: client errors, not 500. */
+    @ExceptionHandler({org.springframework.web.multipart.support.MissingServletRequestPartException.class,
+            org.springframework.web.multipart.MultipartException.class,
+            org.springframework.web.bind.MissingServletRequestParameterException.class})
+    ResponseEntity<ApiError> missingPart(Exception ex) {
+        return ResponseEntity.badRequest().body(ApiError.of(ErrorCodes.VALIDATION_FAILED,
+                "Required request part or parameter is missing (multipart field 'file' for receipts)"));
+    }
+
+    /** Wrong Content-Type for the endpoint (e.g. JSON sent to the multipart receipt upload): 415, not 500. */
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+    ResponseEntity<ApiError> mediaType(org.springframework.web.HttpMediaTypeNotSupportedException ex) {
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(ApiError.of(ErrorCodes.MALFORMED_REQUEST,
+                "Content-Type " + ex.getContentType() + " is not supported here"));
+    }
+
+    /** Wrong HTTP method on an existing path: 405, not 500. */
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    ResponseEntity<ApiError> method(org.springframework.web.HttpRequestMethodNotSupportedException ex) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(ApiError.of(ErrorCodes.MALFORMED_REQUEST,
+                "Method " + ex.getMethod() + " is not allowed here"));
+    }
+
     /** Wrong type in a path or query parameter (e.g. ?status=NOPE) is a client error, not a 500. */
     @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
     ResponseEntity<ApiError> typeMismatch(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex) {
