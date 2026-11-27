@@ -27,8 +27,6 @@ jobs:
           cache: maven
       - run: chmod +x mvnw
       - run: ./mvnw -B verify
-        env:
-          MVNW_VERBOSE: 'true'
 
   mock-bank:
     runs-on: ubuntu-latest
@@ -72,16 +70,11 @@ jobs:
       - name: npm audit (frontend, production deps)
         working-directory: frontend
         run: npm audit --omit=dev --audit-level=high
-      - name: Trivy scan of Maven dependencies (backend + mock-bank)
-        uses: aquasecurity/trivy-action@v0.33.1
-        with:
-          scan-type: fs
-          scan-ref: .
-          scanners: vuln
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: '1'
-          skip-dirs: frontend,node_modules
+      - name: OSV scan of Maven dependencies (backend + mock-bank)
+        run: |
+          curl -sSfL -o osv-scanner https://github.com/google/osv-scanner/releases/download/v2.0.2/osv-scanner_linux_amd64
+          chmod +x osv-scanner
+          ./osv-scanner scan source --lockfile backend/pom.xml --lockfile services/mock-bank/pom.xml
 
   images:
     runs-on: ubuntu-latest
