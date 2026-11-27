@@ -206,6 +206,17 @@ class AdminApiTest extends AbstractIntegrationTest {
         assertThat(users.findById(admin.getId()).orElseThrow().isEnabled()).isTrue();
     }
 
+    @Test
+    void nonAdmin_getsForbidden_evenWithInvalidBody_noValidationLeak() throws Exception {
+        HttpResponse<String> create = send("POST", "/api/admin/users", employeeToken, "{}");
+        assertThat(create.statusCode()).isEqualTo(403);
+        assertThat(create.body()).contains("\"code\":\"FORBIDDEN\"").doesNotContain("VALIDATION_FAILED");
+        assertThat(send("PUT", "/api/admin/users/" + admin.getId() + "/roles", employeeToken, "{}").statusCode())
+                .isEqualTo(403);
+        assertThat(send("PUT", "/api/admin/users/" + admin.getId() + "/roles", employeeToken, "not json")
+                .statusCode()).isEqualTo(403);
+    }
+
     // ---- audit / overview / health ----
 
     @Test
