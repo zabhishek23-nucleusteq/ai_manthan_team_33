@@ -50,7 +50,7 @@ describe('login form', () => {
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'Log in' }))
     expect(await screen.findByText('Enter your email')).toBeInTheDocument()
-    expect(screen.getByText('Enter your password')).toBeInTheDocument()
+    expect(await screen.findByText('Enter your password')).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('Email'), 'not-an-email')
     expect(await screen.findByText('Enter a valid email, e.g. name@company.com')).toBeInTheDocument()
@@ -143,9 +143,10 @@ describe('sign-up', () => {
     await user.type(screen.getByLabelText('Password'), 'short')
     await user.type(screen.getByLabelText('Confirm password'), 'different')
     await user.click(screen.getByRole('button', { name: 'Create account' }))
+    // Ant validates fields asynchronously: wait for each message, not only the first.
     expect(await screen.findByText('Password must be 8 to 100 characters')).toBeInTheDocument()
-    expect(screen.getByText('Passwords do not match')).toBeInTheDocument()
-    expect(screen.getByText('Enter your full name')).toBeInTheDocument()
+    expect(await screen.findByText('Passwords do not match')).toBeInTheDocument()
+    expect(await screen.findByText('Enter your full name')).toBeInTheDocument()
   })
 
   it('reports a taken email on the email field', async () => {
