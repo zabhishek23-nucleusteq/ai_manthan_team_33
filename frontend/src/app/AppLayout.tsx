@@ -82,6 +82,23 @@ export function AppLayout() {
     />
   )
 
+  const roleTags = sortedRoles.map((r) => (
+    <Tag key={r} color={r === mainRole ? 'blue' : 'default'} style={{ marginInlineEnd: 0 }}>
+      {ROLE_LABEL[r]}
+    </Tag>
+  ))
+
+  const themeToggle = (
+    <Tooltip title={mode === 'dark' ? 'Light mode' : 'Dark mode'}>
+      <Button
+        type="text"
+        aria-label={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        icon={mode === 'dark' ? <SunOutlined /> : <MoonOutlined />}
+        onClick={toggle}
+      />
+    </Tooltip>
+  )
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <a className="ef-skip-link" href="#main-content">
@@ -91,7 +108,7 @@ export function AppLayout() {
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 12,
+          gap: isDesktop ? 12 : 8,
           paddingInline: isDesktop ? 24 : 16,
           borderBottom: `1px solid ${token.colorBorderSecondary}`,
           position: 'sticky',
@@ -108,30 +125,22 @@ export function AppLayout() {
             onClick={() => setDrawerOpen(true)}
           />
         )}
-        <Typography.Text strong style={{ fontSize: 18, whiteSpace: 'nowrap' }}>
+        <Typography.Text strong style={{ fontSize: isDesktop ? 18 : 16, whiteSpace: 'nowrap', flexShrink: 0 }}>
           ExpenseFlow
         </Typography.Text>
-        <div style={{ flex: 1 }} />
-        {user && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }} data-testid="current-user">
-            <Typography.Text ellipsis style={{ maxWidth: isDesktop ? 220 : 110 }}>
-              {user.name}
+        {/* Takes the free space and truncates, so the header never overflows at 360px. */}
+        <div
+          style={{ flex: '1 1 auto', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}
+          data-testid="current-user"
+        >
+          {user && (
+            <Typography.Text ellipsis={{ tooltip: user.name }} style={{ minWidth: 0 }}>
+              {`Logged in as ${user.name}`}
             </Typography.Text>
-            {(isDesktop ? sortedRoles : mainRole ? [mainRole] : []).map((r) => (
-              <Tag key={r} color={r === mainRole ? 'blue' : 'default'} style={{ marginInlineEnd: 0 }}>
-                {ROLE_LABEL[r]}
-              </Tag>
-            ))}
-          </div>
-        )}
-        <Tooltip title={mode === 'dark' ? 'Light mode' : 'Dark mode'}>
-          <Button
-            type="text"
-            aria-label={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            icon={mode === 'dark' ? <SunOutlined /> : <MoonOutlined />}
-            onClick={toggle}
-          />
-        </Tooltip>
+          )}
+          {isDesktop && roleTags}
+        </div>
+        {isDesktop && themeToggle}
         <Button
           icon={<LogoutOutlined />}
           onClick={() => {
@@ -156,7 +165,9 @@ export function AppLayout() {
             onClose={() => setDrawerOpen(false)}
             size={280}
             styles={{ body: { padding: 0 } }}
+            extra={themeToggle}
           >
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '12px 16px 4px' }}>{roleTags}</div>
             {menu}
           </Drawer>
         )}

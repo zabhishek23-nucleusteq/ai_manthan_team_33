@@ -69,7 +69,8 @@ describe('app shell', () => {
     renderAt('/')
     expect(await screen.findByRole('heading', { name: title })).toBeInTheDocument()
     expect(location()).toBe(route)
-    expect(within(screen.getByTestId('current-user')).getByText(DEMO[key].name)).toBeInTheDocument()
+    // Same text the Playwright TC-01 spec checks.
+    expect(within(screen.getByTestId('current-user')).getByText(`Logged in as ${DEMO[key].name}`)).toBeInTheDocument()
   })
 
   it('direct URL to a forbidden page shows 403 inside the shell', async () => {
