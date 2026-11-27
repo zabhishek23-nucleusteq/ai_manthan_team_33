@@ -40,3 +40,24 @@ Checked on a fresh clone of `main` at `ff515e3` (clone, `start.ps1`, everything 
 - **Demo data vs alert:** the seed has approvals pending 4 to 5 days, so `OldestPendingApprovalTooOld` already fires on a fresh stack. Expected, but the alerts page is not all green.
 - **Flaky tests:** frontend unit tests under CPU load; TC-06 under parallel load. Not product defects; they can turn CI red at random.
 - Not exercised in this review: dashboard UI screens (only the API and the login landing), delegation, bulk approve (APIs merged, UIs pending).
+
+## Re-check after fixes - 19:08 (L1, T-903 unblock)
+Fresh clone of `main` at `8258846`, `docker compose down -v` then a clean start, so the database was reseeded.
+
+| Blocker at 18:00 | Now | Evidence |
+|---|---|---|
+| Main CI red (Maven wget, order-dependent test) | Fixed | PR #64, PR #63 merged; main CI green on the #74 merge (all 8 jobs) |
+| T-025 approver inbox + delegations not merged | Done | PR #59 |
+| T-026 auditor queue UI not merged | Done | PR #67 |
+| T-031 payouts + policy rules screens not merged | Done | PR #61 (policy-rules blank page for CONFIG rows: fix in PR #81) |
+| T-006 role layout + menu not merged | Done | PR #65 |
+| T-035 E2E incomplete | Done | PR #78 |
+| Open bugs T-506 / T-507 / T-508 | Done | PR #56, #50, #51 |
+| Demo auditor could not see claims assigned to other auditors (found in T-190) | Fixed | PR #74 (AUDITOR level = team pool, ADR-001 amendment) |
+
+**Checks**
+- API walk-through of every persona (45 checks: auto-approve/reject, routing, approve, send-back + resubmit, delegation, auditor queue + bulk approve + sample audit, payout -> CSV -> mock bank -> PAID, dashboards for 4 roles, admin, 403s, 11 web routes): **45/45 pass**.
+- Playwright (API RBAC matrix + UI desktop + UI 360 px + axe): **153 passed, 0 failed, 10 skipped**. The skipped tests are TC-08/09/10/12/13 (`test.fixme`, run on 2 projects); the API walk-through covers those flows.
+- Found during the re-check: changing `FRONTEND_PORT` broke browser login (403 CORS), because compose never passed `CORS_ALLOWED_ORIGINS`. Fixed in this PR: it is now derived from `FRONTEND_PORT`.
+
+**Result: PASS.** Payout -> CSV -> bank -> PAID, dashboards with 1D/7D/1M/Custom, super admin screens, drill + runbook + RCA, and more than 10 E2E cases green.
