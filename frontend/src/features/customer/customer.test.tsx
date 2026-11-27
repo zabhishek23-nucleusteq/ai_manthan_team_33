@@ -91,11 +91,11 @@ describe('claim editor', () => {
     renderApp('/claims/new')
     await userEvent.click(await screen.findByRole('button', { name: /submit/i }))
     expect(await screen.findByText('Enter a title, e.g. Client visit Pune')).toBeInTheDocument()
-    expect(screen.getByText('Choose a category')).toBeInTheDocument()
-    expect(screen.getByText('Choose the expense date')).toBeInTheDocument()
-    expect(screen.getByText('Enter the amount')).toBeInTheDocument()
-    expect(screen.getByText('Enter the vendor')).toBeInTheDocument()
-    expect(screen.getByRole('alert')).toHaveTextContent('Title, Line 1')
+    expect(await screen.findByText('Choose a category')).toBeInTheDocument()
+    expect(await screen.findByText('Choose the expense date')).toBeInTheDocument()
+    expect(await screen.findByText('Enter the amount')).toBeInTheDocument()
+    expect(await screen.findByText('Enter the vendor')).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Title, Line 1')
   })
 
   it('adds and removes lines', async () => {

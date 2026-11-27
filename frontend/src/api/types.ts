@@ -122,6 +122,25 @@ export interface ClaimSummary {
   updatedAt?: string
 }
 
+export interface Comment {
+  id: number
+  author: UserRef
+  text: string
+  createdAt: string
+}
+
+export interface AuditEvent {
+  id: number
+  at: string
+  actor?: UserRef
+  onBehalfOf?: UserRef
+  action: string
+  entityType?: string
+  entityId?: string
+  before?: Record<string, unknown>
+  after?: Record<string, unknown>
+}
+
 export interface Page<T> {
   items: T[]
   page: number

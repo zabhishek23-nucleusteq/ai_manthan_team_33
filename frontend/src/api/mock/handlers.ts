@@ -1,17 +1,26 @@
-import type { ApprovalLevel, Claim, ClaimInput, Violation } from '../types'
-import { buildClaims, DEPARTMENTS, toSummary } from './fixtures'
+import type { ApprovalLevel, AuditEvent, Claim, ClaimInput, Comment, Violation } from '../types'
+import { auditFor, buildClaims, buildComments, DEPARTMENTS, toSummary } from './fixtures'
 import { err, mockRoute, type MockRequest, type MockResponse } from './router'
 
 /** In-memory state for the mock backend; reset with resetMockState(). */
 let claims: Claim[] = buildClaims()
+let comments = buildComments(claims)
 let nextClaimId = 2001
+let nextCommentId = 100
 const idempotency = new Map<string, { claimId: number; response: MockResponse }>()
+/** Audit events kept across resubmits / comments (the derived part is rebuilt from the claim). */
+const extraAudit = new Map<number, AuditEvent[]>()
 
 export function resetMockState(): void {
   claims = buildClaims()
+  comments = buildComments(claims)
   nextClaimId = 2001
+  nextCommentId = 100
   idempotency.clear()
+  extraAudit.clear()
 }
+
+const addAudit = (claimId: number, e: AuditEvent) => extraAudit.set(claimId, [...(extraAudit.get(claimId) ?? []), e])
 
 const EDITABLE = new Set(['DRAFT', 'CLARIFICATION_REQUESTED'])
 
@@ -153,6 +162,29 @@ export function registerDefaultMocks(): void {
     return { status: 201, body: c }
   })
 
+  mockRoute('GET', '/api/claims/{id}/audit', (req) => {
+    const c = ownClaim(req, req.params.id)
+    return c ? { status: 200, body: auditFor(c, extraAudit.get(c.id)) } : err(404, 'NOT_FOUND', 'Claim not found')
+  })
+
+  mockRoute('GET', '/api/claims/{id}/comments', (req) => {
+    const c = ownClaim(req, req.params.id)
+    return c ? { status: 200, body: comments.get(c.id) ?? [] } : err(404, 'NOT_FOUND', 'Claim not found')
+  })
+
+  mockRoute('POST', '/api/claims/{id}/comments', (req) => {
+    const c = ownClaim(req, req.params.id)
+    if (!c) return err(404, 'NOT_FOUND', 'Claim not found')
+    const text = String((req.body as { text?: unknown } | undefined)?.text ?? '').trim()
+    if (!text || text.length > 2000)
+      return err(400, 'VALIDATION_FAILED', 'Comment must be 1 to 2000 characters', { fields: { text: 'required' } })
+    const author = { id: req.userId!, name: c.employee?.name ?? 'You', email: req.email ?? '' }
+    const comment: Comment = { id: nextCommentId++, author, text, createdAt: new Date().toISOString() }
+    comments.set(c.id, [...(comments.get(c.id) ?? []), comment])
+    addAudit(c.id, { id: 9000 + comment.id, at: comment.createdAt, action: 'COMMENT_ADDED', actor: author, entityType: 'CLAIM', entityId: String(c.id), after: { text } })
+    return { status: 201, body: comment }
+  })
+
   mockRoute('GET', '/api/claims/{id}', (req) => {
     const { params } = req
     const c = ownClaim(req, params.id)
@@ -198,6 +230,11 @@ export function registerDefaultMocks(): void {
     if (!EDITABLE.has(c.status))
       return err(409, 'ILLEGAL_STATE_TRANSITION', `Claim ${c.code} is ${c.status}; cannot submit`, { from: c.status, action: 'submit' })
     if (c.lines.length === 0) return err(422, 'CLAIM_EMPTY', 'Add at least one expense line before submitting')
+    if (c.status === 'CLARIFICATION_REQUESTED') {
+      // Keep the first round (submit, policy, send-back) in the timeline before the chain restarts.
+      const history = auditFor(c).filter((e) => e.action !== 'CLAIM_CREATED')
+      history.forEach((e) => addAudit(c.id, { ...e, id: e.id + 50 }))
+    }
     applyMockPolicy(c)
     c.submittedAt = new Date().toISOString()
     c.version = (c.version ?? 1) + 1

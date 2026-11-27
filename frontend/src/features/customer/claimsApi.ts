@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api/client'
-import type { Claim, ClaimInput, ClaimStatus, ClaimSummaryPage, Receipt } from '../../api/types'
+import type { AuditEvent, Claim, ClaimInput, ClaimStatus, ClaimSummaryPage, Comment, Receipt } from '../../api/types'
 
 export const claimKeys = {
   all: ['claims'] as const,
@@ -45,6 +45,32 @@ export function useSubmitClaim() {
     onSuccess: (c) => {
       qc.setQueryData(claimKeys.detail(c.id), c)
       void qc.invalidateQueries({ queryKey: ['claims', 'list'] })
+    },
+  })
+}
+
+export function useClaimAudit(id: number) {
+  return useQuery({
+    queryKey: ['claims', 'audit', id],
+    queryFn: () => api.get<AuditEvent[]>(`/api/claims/${id}/audit`),
+  })
+}
+
+export function useClaimComments(id: number | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ['claims', 'comments', id ?? -1],
+    queryFn: () => api.get<Comment[]>(`/api/claims/${id}/comments`),
+    enabled: enabled && id !== undefined && Number.isFinite(id),
+  })
+}
+
+export function useAddComment(id: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (text: string) => api.post<Comment>(`/api/claims/${id}/comments`, { text }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['claims', 'comments', id] })
+      void qc.invalidateQueries({ queryKey: ['claims', 'audit', id] })
     },
   })
 }

@@ -11,6 +11,7 @@ import { LandingPlaceholder } from './features/auth/LandingPlaceholder'
 import { LoginPage } from './features/auth/LoginPage'
 import { landingRouteFor } from './features/auth/roles'
 import { SignupPage } from './features/auth/SignupPage'
+import { ClaimDetailPage } from './features/customer/ClaimDetailPage'
 import { ClaimEditorPage } from './features/customer/ClaimEditorPage'
 import { ClaimOutcomePage } from './features/customer/ClaimOutcomePage'
 import { ClaimsListPage } from './features/customer/ClaimsListPage'
@@ -78,7 +79,7 @@ export function AppRoutes() {
         }
       />
 
-      {/* Employee claim capture (T-022). /claims/:id shows the outcome view until the detail page (T-023). */}
+      {/* Employee claim capture (T-022) and claim detail with timeline/comments (T-023). */}
       <Route
         path="/claims"
         element={
@@ -115,7 +116,7 @@ export function AppRoutes() {
         path="/claims/:id"
         element={
           <RequireRole roles={['EMPLOYEE']}>
-            <ClaimOutcomePage />
+            <ClaimDetailPage />
           </RequireRole>
         }
       />
