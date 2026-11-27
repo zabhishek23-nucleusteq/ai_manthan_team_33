@@ -66,6 +66,24 @@ test.fixme('TC-13 finance head creates a payout batch and downloads the bank CSV
   // needs: payout batch API (T-017) and UI (T-031)
 });
 
-test.fixme('TC-14 dashboard date presets 1D / 7D / 1M change the numbers', async () => {
-  // needs: role dashboards UI (T-033)
+test('TC-14 dashboard date presets 1D / 7D / 1M change the numbers', async ({ page }) => {
+  // Auditor sees the whole company (scope ALL); seeded history is spread over the past months, so a wider
+  // range can only include more claims.
+  await loginAs(page, DEMO_USERS[2]);
+  const claims = page.getByTestId('kpi-claims');
+  const readClaims = async () => Number((await claims.locator('.ant-statistic-content').innerText()).replace(/[^0-9]/g, ''));
+  const range = page.getByRole('radiogroup', { name: 'Date range' });
+  await expect(claims).toBeVisible({ timeout: 15_000 });
+  const counts: number[] = [];
+  for (const label of ['1 Day', '7 Days', '1 Month']) {
+    const option = range.getByText(label, { exact: true });
+    // Already the active preset (the page has a default): the shown number is current, no reload to wait for.
+    const active = await range.locator('.ant-segmented-item-selected').innerText();
+    const before = await readClaims();
+    await option.click();
+    if (active.trim() !== label) await expect.poll(readClaims, { timeout: 15_000 }).not.toBe(before);
+    counts.push(await readClaims());
+  }
+  expect(counts[0]).toBeLessThan(counts[1]);
+  expect(counts[1]).toBeLessThan(counts[2]);
 });
