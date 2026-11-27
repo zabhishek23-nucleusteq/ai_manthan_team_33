@@ -20,6 +20,8 @@ for ($i = 0; $i -lt 90; $i++) {
       Write-Host "Frontend:  http://localhost:$fp"
       Write-Host "Backend:   http://localhost:$bp  (health: /actuator/health, docs: /swagger-ui.html)"
       Write-Host "Mock bank: http://localhost:$(Get-Cfg 'MOCK_BANK_PORT' '8081')"
+      Write-Host "Prometheus: http://localhost:$(Get-Cfg 'PROMETHEUS_PORT' '9090')"
+      Write-Host "Grafana:   http://localhost:$(Get-Cfg 'GRAFANA_PORT' '3001')  (anonymous viewer; admin login in .env)"
       Write-Host 'Demo logins: see README (Run section)'
       exit 0
     }
