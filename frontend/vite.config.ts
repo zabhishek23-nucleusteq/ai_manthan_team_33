@@ -15,5 +15,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // The first App render per file loads antd + recharts cold (5-8 s on the team laptops).
+    testTimeout: 20_000,
   },
 })
