@@ -352,6 +352,15 @@ paths:
       responses:
         '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/PayoutBatch' } } } }
         '422': { $ref: '#/components/responses/Unprocessable' }
+  /api/payout-batches/eligible:
+    get:
+      tags: [payouts]
+      summary: Claims a new batch would take now (BR-18), so the UI can confirm before POST (T-031)
+      description: Same BR-18 filter as POST /api/payout-batches (APPROVED, sample audit not PENDING/EXCEPTION, not in another batch). FINANCE_AUDITOR / FINANCE_HEAD.
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/PayoutEligible' }, example: { count: 12, total: 184250.50 } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /api/payout-batches/{id}:
     parameters: [ { $ref: '#/components/parameters/Id' } ]
     get:
@@ -787,6 +796,12 @@ components:
         lastError: { type: string }
         createdAt: { type: string, format: date-time }
         items: { type: array, items: { type: object, properties: { claimId: { type: integer }, claimCode: { type: string }, employee: { $ref: '#/components/schemas/UserRef' }, amount: { type: number } } } }
+    PayoutEligible:
+      type: object
+      required: [count, total]
+      properties:
+        count: { type: integer, format: int64, description: claims a new batch would take }
+        total: { type: number, description: sum of their totals in INR }
     PolicyRule:
       type: object
       properties:
