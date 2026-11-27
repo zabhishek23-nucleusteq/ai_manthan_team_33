@@ -291,7 +291,12 @@ class ClaimApiTest extends AbstractIntegrationTest {
 
     @Test
     void submit_routed_pendingManager_publishesRoutedEventForApprovalService() throws Exception {
+        // T-019: an employee without a manager escalates to AUDITOR (BR-15), so give this one a manager
+        Who mgr = user("EMPLOYEE", "MANAGER");
         Who w = employee();
+        User emp = users.findById(w.id()).orElseThrow();
+        emp.setManager(users.findById(mgr.id()).orElseThrow());
+        users.save(emp);
         long rid = receipt(w);
         long id = createClaim(w, line("TRAVEL", "30000", "IndiGo " + uid(), rid));
         JsonNode c = body(submit(w, id, "k-" + uid()));

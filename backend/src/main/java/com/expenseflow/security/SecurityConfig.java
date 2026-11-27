@@ -57,6 +57,9 @@ public class SecurityConfig {
                 // L2 (T-017): payouts - read/export AUD + HEAD, create/submit HEAD only (before the Idempotency-Key filter)
                 .requestMatchers(HttpMethod.GET, "/api/payout-batches", "/api/payout-batches/**").hasAnyRole("FINANCE_AUDITOR", "FINANCE_HEAD")
                 .requestMatchers("/api/payout-batches", "/api/payout-batches/**").hasRole("FINANCE_HEAD")
+                // T-019: approvals + delegations = MGR, AUD, HEAD (rbac.md section 3), 403 before body validation
+                .requestMatchers("/api/approvals/**", "/api/delegations", "/api/delegations/**")
+                    .hasAnyRole("MANAGER", "FINANCE_AUDITOR", "FINANCE_HEAD")
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e
                 .authenticationEntryPoint(JsonSecurityErrorHandlers.entryPoint())
