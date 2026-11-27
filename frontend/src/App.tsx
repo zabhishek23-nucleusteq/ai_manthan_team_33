@@ -15,6 +15,9 @@ import { ClaimDetailPage } from './features/customer/ClaimDetailPage'
 import { ClaimEditorPage } from './features/customer/ClaimEditorPage'
 import { ClaimOutcomePage } from './features/customer/ClaimOutcomePage'
 import { ClaimsListPage } from './features/customer/ClaimsListPage'
+import { ApprovalDetailPage } from './features/staff/ApprovalDetailPage'
+import { ApprovalsInboxPage } from './features/staff/ApprovalsInboxPage'
+import { DelegationsPage } from './features/staff/DelegationsPage'
 
 function NotFound() {
   return (
@@ -117,6 +120,32 @@ export function AppRoutes() {
         element={
           <RequireRole roles={['EMPLOYEE']}>
             <ClaimDetailPage />
+          </RequireRole>
+        }
+      />
+
+      {/* Approver inbox, claim review with receipt viewer, delegation (T-025). */}
+      <Route
+        path="/approvals"
+        element={
+          <RequireRole roles={['MANAGER', 'FINANCE_AUDITOR', 'FINANCE_HEAD']}>
+            <ApprovalsInboxPage />
+          </RequireRole>
+        }
+      />
+      <Route
+        path="/approvals/:claimId"
+        element={
+          <RequireRole roles={['MANAGER', 'FINANCE_AUDITOR', 'FINANCE_HEAD']}>
+            <ApprovalDetailPage />
+          </RequireRole>
+        }
+      />
+      <Route
+        path="/delegations"
+        element={
+          <RequireRole roles={['MANAGER', 'FINANCE_AUDITOR', 'FINANCE_HEAD']}>
+            <DelegationsPage />
           </RequireRole>
         }
       />
