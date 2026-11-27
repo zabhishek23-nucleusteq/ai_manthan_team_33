@@ -9,7 +9,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 
+import com.expenseflow.dashboard.KpiDtos.Kpis;
 import com.expenseflow.security.AuthDtos.UserRef;
+import com.fasterxml.jackson.annotation.JsonUnwrapped;
 
 /** Shapes of /api/admin/** (contracts/openapi.yaml, tag admin). */
 public final class AdminDtos {
@@ -40,11 +42,8 @@ public final class AdminDtos {
             String entityType, String entityId, Object before, Object after) {
     }
 
-    public record Range(Instant from, Instant to) {
-    }
-
-    /** System-wide user statistics. KPI totals/series (Kpis schema) are added by the dashboard task T-027. */
-    public record Overview(Range range, String scope, Map<String, Long> usersByRole, long activeUsers,
+    /** Contract: allOf(Kpis, user statistics) - the KPI fields are unwrapped to the top level. */
+    public record Overview(@JsonUnwrapped Kpis kpis, Map<String, Long> usersByRole, long activeUsers,
             long totalUsers, long newUsersInRange) {
     }
 
