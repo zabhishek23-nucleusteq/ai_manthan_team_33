@@ -42,6 +42,9 @@ management:
   metrics:
     tags:
       application: expenseflow
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
 
 springdoc:
   api-docs:

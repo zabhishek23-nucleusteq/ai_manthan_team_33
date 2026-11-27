@@ -50,11 +50,18 @@ public class PageLoadTelemetry {
     @PostMapping("/api/telemetry/page-load")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void record(@Valid @RequestBody PageLoad body) {
-        timers.computeIfAbsent(tagFor(body.route()), route -> Timer.builder("expenseflow.page.load")
-                        .description("Page load time reported by the UI").tag("route", route)
-                        .publishPercentileHistogram().minimumExpectedValue(Duration.ofMillis(50))
-                        .maximumExpectedValue(Duration.ofSeconds(30)).register(registry))
-                .record(Duration.ofMillis(body.ms()));
+        String route = tagFor(body.route());
+        Duration took = Duration.ofMillis(body.ms());
+        // NFR-OBS name + the name the Grafana dashboard queries (sre-handbook s2)
+        timer("expenseflow.page.load", route).record(took);
+        timer("page.load", route).record(took);
+    }
+
+    private Timer timer(String name, String route) {
+        return timers.computeIfAbsent(name + "|" + route, k -> Timer.builder(name)
+                .description("Page load time reported by the UI").tag("route", route)
+                .publishPercentileHistogram().minimumExpectedValue(Duration.ofMillis(50))
+                .maximumExpectedValue(Duration.ofSeconds(30)).register(registry));
     }
 
     String tagFor(String rawRoute) {
