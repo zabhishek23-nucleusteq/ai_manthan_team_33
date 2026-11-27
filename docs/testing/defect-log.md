@@ -10,9 +10,11 @@ Every bug found by tests, gates, SRE or review. Flow: `docs/sre/sre-handbook.md`
 | T-503 | SEV3 | CI | Admin write endpoints 400 instead of 403 (duplicate report of T-502) | L3 | merged | Closed (duplicate) |
 | T-504 | SEV2 | CI | main red: known-bug markers for T-502 still in rbac.spec.ts after the fix | L1 | merged | Closed (duplicate of T-505) |
 | T-505 | SEV2 | CI | Main CI red: remove fixed T-502 entries from KNOWN_BUGS (PR 40) | L6 | merged | Closed |
-| T-506 | SEV3 | axe in a11y.spec.ts | Colour contrast and in-text link violations on login, sign-up, landing, 403 and My claims | L4 | - | Open (spec expects failure until fixed) |
-| T-507 | SEV3 | security probe | Login has no rate limit or lockout: 25 wrong passwords in a row all answered 401 | L3 | - | Open |
-| T-508 | SEV3 | security probe | Frontend nginx sends no security headers (CSP, X-Frame-Options, nosniff) | L4 | - | Open |
+| T-506 | SEV3 | axe in a11y.spec.ts | Colour contrast and in-text link violations on login, sign-up, landing, 403 and My claims | L4 | PR 56 | Closed - verified 2026-11-27: axe (WCAG 2 A/AA) clean on all 5 screens at 1280 and 360 px |
+| T-507 | SEV3 | security probe | Login has no rate limit or lockout: 25 wrong passwords in a row all answered 401 | L3 | merged | Closed - verified: 12 wrong logins give 401 x5 then 429 |
+| T-508 | SEV3 | security probe | Frontend nginx sends no security headers (CSP, X-Frame-Options, nosniff) | L2 | merged | Closed - verified: CSP, X-Frame-Options DENY, nosniff, Referrer-Policy on :3000 |
+| T-509 | SEV3 | team | 403 page right after login when switching demo users (stale ?next= from previous role) | L2 | merged | Closed |
+| T-510 | SEV3 | CI | SeedTest flaky: DUPLICATE_LINE 59 < 60 | L3 | merged | Closed |
 
 Process notes
 - The "known bug" mechanism (`test.fail` with the bug id) keeps CI usable while a bug is open and turns CI red the moment the bug is fixed, so the marker is removed in the same PR as the fix.
