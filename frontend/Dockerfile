@@ -4,8 +4,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
-# In-browser mock for /api until the backend endpoints exist (claims: T-016); --build-arg VITE_MOCK=0 for all-real.
-ARG VITE_MOCK=1
+# Real backend for everything (claims API merged in T-016). --build-arg VITE_MOCK=1 VITE_MOCK_AUTH=1 = offline demo with the in-browser mock.
+ARG VITE_MOCK=0
 # Auth separately: 0 = real login against the backend (demo users seeded by T-013); 1 = mock logins.
 ARG VITE_MOCK_AUTH=0
 ENV VITE_MOCK=$VITE_MOCK VITE_MOCK_AUTH=$VITE_MOCK_AUTH
