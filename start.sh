@@ -13,6 +13,8 @@ for _ in $(seq 1 90); do
     echo "Frontend:  http://localhost:$FP"
     echo "Backend:   http://localhost:$BP  (health: /actuator/health, docs: /swagger-ui.html)"
     echo "Mock bank: http://localhost:${MOCK_BANK_PORT:-8081}"
+    echo "Prometheus: http://localhost:${PROMETHEUS_PORT:-9090}"
+    echo "Grafana:    http://localhost:${GRAFANA_PORT:-3001}  (anonymous viewer; admin login in .env)"
     echo "Demo logins: see README (Run section)"
     exit 0
   fi

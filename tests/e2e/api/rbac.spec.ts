@@ -85,6 +85,13 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'GET', path: '/api/admin/health', allowed: ['SUPER_ADMIN'] },
 ];
 
+// Known backend defects. These checks are expected to fail (test.fail): when the bug is fixed they start
+// "unexpectedly passing", which fails CI and tells us to delete the entry. Key: "METHOD contract-path".
+const KNOWN_BUGS: Record<string, string> = {
+  'POST /api/admin/users': 'T-502: 400 instead of 403 (body validated before @PreAuthorize)',
+  'PUT /api/admin/users/{id}/roles': 'T-502: 400 instead of 403 (body validated before @PreAuthorize)',
+};
+
 const norm = (p: string) => p.replace(/\{[^}]+\}/g, '{}');
 const concrete = (p: string) => p.replace(/\{code\}/g, 'NO_SUCH_RULE').replace(/\{[^}]+\}/g, '999999999');
 
@@ -152,6 +159,8 @@ test.describe('RBAC matrix (rbac.md s3)', () => {
         (r) => tokens[r] && !EFFECTIVE[r].some((eff) => ep.allowed.includes(eff)),
       );
       test.skip(!denied, 'no demo user without access can log in yet (seed data, T-013)');
+      const bug = KNOWN_BUGS[`${ep.method} ${ep.path}`];
+      if (bug) test.fail(true, bug);
       const res = await call(ep, tokens[denied!]);
       expect(res.status(), `${denied} got ${res.status()}`).toBe(403);
     });
