@@ -223,7 +223,7 @@ public class SeedService {
         int[] idx = {0};
         // demo logins first (rbac.md section 4); ids assigned in creation order
         head = assign(user("Farhan Head", "head@expenseflow.test", "FIN", null, "FINANCE_HEAD", "SUPER_ADMIN"), ids, idx);
-        admin = assign(user("Sam Admin", "admin@expenseflow.test", "OPS", head), ids, idx);
+        admin = assign(user("Abhishek Admin", "admin@expenseflow.test", "OPS", head), ids, idx);
         admin.roles.clear();
         admin.roles.add("SUPER_ADMIN");
         anita = assign(user("Anita Auditor", "auditor@expenseflow.test", "FIN", head, "FINANCE_AUDITOR"), ids, idx);

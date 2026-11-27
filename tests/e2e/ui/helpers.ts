@@ -10,7 +10,7 @@ export const DEMO_USERS: DemoUser[] = [
   { key: 'manager', email: 'manager@expenseflow.test', name: 'Rahul Manager', landing: '/manager/dashboard' },
   { key: 'auditor', email: 'auditor@expenseflow.test', name: 'Anita Auditor', landing: '/finance/dashboard' },
   { key: 'head', email: 'head@expenseflow.test', name: 'Farhan Head', landing: '/admin' },
-  { key: 'admin', email: 'admin@expenseflow.test', name: 'Sam Admin', landing: '/admin' },
+  { key: 'admin', email: 'admin@expenseflow.test', name: 'Abhishek Admin', landing: '/admin' },
 ];
 
 export async function login(page: Page, email: string, password = DEMO_PASSWORD) {

@@ -20,7 +20,7 @@ const users: MockUser[] = [
     email: 'head@expenseflow.test',
     roles: ['EMPLOYEE', 'FINANCE_HEAD', 'SUPER_ADMIN'],
   },
-  { id: 5, name: 'Sam Admin', email: 'admin@expenseflow.test', roles: ['SUPER_ADMIN'] },
+  { id: 5, name: 'Abhishek Admin', email: 'admin@expenseflow.test', roles: ['SUPER_ADMIN'] },
   { id: 6, name: 'Meera Backup', email: 'manager2@expenseflow.test', roles: ['EMPLOYEE', 'MANAGER'] },
 ].map((u) => ({ ...u, roles: u.roles as Role[], password: DEMO_PASSWORD }))
 
