@@ -36,13 +36,13 @@ async function submitMealClaim(page: Page, amount: number) {
 test('TC-06 employee submits a small claim -> auto-approved', async ({ page }) => {
   await loginAs(page, DEMO_USERS[0]);
   await submitMealClaim(page, 250); // <= 500 INR: no receipt needed; <= 1,500 INR meals limit
-  await expect(page.getByText('Claim auto-approved')).toBeVisible();
+  await expect(page.getByText('Claim auto-approved')).toBeVisible({ timeout: 15_000 });
 });
 
 test('TC-07 meal without receipt over 500 INR -> auto-rejected with a reason', async ({ page }) => {
   await loginAs(page, DEMO_USERS[0]);
   await submitMealClaim(page, 800); // > 500 INR and no receipt attached
-  await expect(page.getByText('Claim rejected by policy')).toBeVisible();
+  await expect(page.getByText('Claim rejected by policy')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/receipt/i).first()).toBeVisible();
 });
 

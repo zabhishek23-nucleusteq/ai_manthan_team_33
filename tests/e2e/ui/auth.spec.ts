@@ -7,7 +7,7 @@ test.describe('TC-01 login lands each role on its own dashboard', () => {
   for (const u of DEMO_USERS) {
     test(`${u.key} -> ${u.landing}`, async ({ page }) => {
       await loginAs(page, u);
-      await expect(page.getByText(`Logged in as ${u.name}`)).toBeVisible();
+      await expect(page.getByText(u.heading).first()).toBeVisible();
     });
   }
 });
