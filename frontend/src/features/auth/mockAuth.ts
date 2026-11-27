@@ -35,7 +35,7 @@ function publicUser({ password: _pw, ...u }: MockUser): User {
 
 function tokenFor(u: User): string {
   // Unsigned fake JWT; only the mock backend reads it.
-  const payload = btoa(JSON.stringify({ sub: String(u.id), roles: u.roles, exp: Math.floor(Date.now() / 1000) + EXPIRES_IN }))
+  const payload = btoa(JSON.stringify({ sub: String(u.id), email: u.email, roles: u.roles, exp: Math.floor(Date.now() / 1000) + EXPIRES_IN }))
   return `mock.${payload}.sig`
 }
 

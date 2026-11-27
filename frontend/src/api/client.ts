@@ -15,9 +15,18 @@ export interface RequestOptions {
   signal?: AbortSignal
   /** Skip the Bearer token and the 401 -> logout hook (login/sign-up). */
   anonymous?: boolean
+  /** Always call the real backend, even in mock mode (used by auth when VITE_MOCK_AUTH=0). */
+  real?: boolean
 }
 
+/** VITE_MOCK=1: use the in-browser mock backend for /api calls (except auth when VITE_MOCK_AUTH=0). */
 export const isMockMode = (): boolean => import.meta.env.VITE_MOCK === '1'
+
+/** Auth can be switched separately: VITE_MOCK_AUTH=0 logs in against the real backend while other APIs stay mocked. */
+export const isMockAuth = (): boolean => {
+  const v = import.meta.env.VITE_MOCK_AUTH
+  return v === undefined || v === '' ? isMockMode() : v === '1'
+}
 
 let onUnauthorized: () => void = expireSession
 
@@ -45,7 +54,7 @@ export function buildUrl(path: string, query?: Query): string {
  * on 401 (for authenticated calls) clears the session and sends the user to Login.
  */
 export async function apiFetch<T>(path: string, opts: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', query, body, idempotencyKey, headers = {}, signal, anonymous = false } = opts
+  const { method = 'GET', query, body, idempotencyKey, headers = {}, signal, anonymous = false, real = false } = opts
   const url = buildUrl(path, query)
 
   const h: Record<string, string> = { Accept: 'application/json', ...headers }
@@ -59,7 +68,7 @@ export async function apiFetch<T>(path: string, opts: RequestOptions = {}): Prom
 
   let res: Response
   try {
-    if (isMockMode()) {
+    if (isMockMode() && !real) {
       res = await handleMockRequest(method, url, h, body)
     } else {
       res = await fetch(url, {
