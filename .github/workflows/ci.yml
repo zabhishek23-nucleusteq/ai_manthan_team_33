@@ -7,7 +7,7 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -17,7 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       MVNW_REPOURL: https://repo1.maven.org/maven2
-      MVNW_VERBOSE: 'true'
     defaults:
       run:
         working-directory: backend
@@ -37,7 +36,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       MVNW_REPOURL: https://repo1.maven.org/maven2
-      MVNW_VERBOSE: 'true'
     defaults:
       run:
         working-directory: services/mock-bank
