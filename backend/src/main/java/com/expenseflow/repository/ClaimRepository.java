@@ -1,0 +1,28 @@
+package com.expenseflow.repository;
+
+import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.expenseflow.domain.Claim;
+
+public interface ClaimRepository extends JpaRepository<Claim, Long> {
+
+    /** Owner-scoped lookup: other users' claims are simply not found (404, no enumeration). */
+    Optional<Claim> findByIdAndEmployeeId(Long id, Long employeeId);
+
+    Page<Claim> findByEmployeeId(Long employeeId, Pageable pageable);
+
+    /** Row lock for state transitions (approve / reject / send back / payout). */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from Claim c where c.id = :id")
+    Optional<Claim> findByIdForUpdate(Long id);
+
+    boolean existsByCode(String code);
+}
