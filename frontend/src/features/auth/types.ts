@@ -37,22 +37,4 @@ export interface SignupRequest {
   departmentId?: number
 }
 
-export interface ApiErrorBody {
-  code: string
-  message: string
-  details?: Record<string, unknown>
-}
-
-export class ApiError extends Error {
-  readonly status: number
-  readonly code: string
-  readonly details?: Record<string, unknown>
-
-  constructor(status: number, body: Partial<ApiErrorBody>) {
-    super(body.message ?? `Request failed (${status})`)
-    this.name = 'ApiError'
-    this.status = status
-    this.code = body.code ?? (status === 0 ? 'NETWORK_ERROR' : 'UNKNOWN')
-    this.details = body.details
-  }
-}
+export { ApiError, type ApiErrorBody } from '../../api/errors'

@@ -14,4 +14,8 @@ npm run build      # tsc -b && vite build
 - Showcase: `/design` (tokens, Card/Statistic, claim status Tags, Form, Table, page states).
 - Shared states for every screen: `PageLoading`, `PageEmpty`, `PageError` in `src/components/PageState.tsx`.
 - Claim status -> Tag mapping: `src/design/claimStatus.ts` (provisional until the contract enum lands).
+- API layer `src/api`: `api.get/post/put/patch/delete` (Bearer token, typed `ApiError {status, code, message, details}`, 401 -> logout),
+  `useIdempotencyKey()` for state-changing POSTs, contract types in `types.ts`, `QueryProvider` (no retry on 4xx).
+- Mock mode `VITE_MOCK=1`: auth + `src/api/mock` handlers (departments, claims CRUD, submit with idempotency replay).
+  Add handlers for your endpoints with `mockRoute(method, '/api/x/{id}', handler)` in `src/api/mock/handlers.ts`.
 - Docker: `Dockerfile` builds and serves with nginx (`nginx.conf`: SPA fallback, `/api` -> `backend:8080`).
