@@ -3,6 +3,7 @@ package com.expenseflow.audit;
 import java.time.Clock;
 import java.time.Instant;
 
+import org.springframework.context.event.EventListener;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -45,10 +46,28 @@ public class AuditService {
     @Transactional(propagation = Propagation.MANDATORY)
     public AuditEvent record(String action, String entityType, Object entityId, Object before, Object after,
                              Long onBehalfOf) {
+        return write(currentUserId(), action, entityType, entityId, before, after, onBehalfOf);
+    }
+
+    /**
+     * Records an {@link AuditableChange} published by another module (e.g. L2's PolicyRuleChangedEvent ->
+     * POLICY_RULE_UPDATED). Synchronous listener + MANDATORY: it runs in the publisher's transaction, so the
+     * change and its audit row commit or roll back together; publishing outside a transaction fails fast.
+     */
+    @EventListener
+    @Transactional(propagation = Propagation.MANDATORY)
+    public AuditEvent on(AuditableChange change) {
+        Long actor = change.actorId() != null ? change.actorId() : currentUserId();
+        return write(actor, change.action(), change.entityType(), change.entityId(), change.before(),
+                change.after(), change.onBehalfOf());
+    }
+
+    private AuditEvent write(Long actorId, String action, String entityType, Object entityId, Object before,
+                             Object after, Long onBehalfOf) {
         if (action == null || action.isBlank() || entityType == null || entityId == null) {
             throw new IllegalArgumentException("action, entityType and entityId are required");
         }
-        AuditEvent event = new AuditEvent(Instant.now(clock), currentUserId(), onBehalfOf, action, entityType,
+        AuditEvent event = new AuditEvent(Instant.now(clock), actorId, onBehalfOf, action, entityType,
                 String.valueOf(entityId), toJson(before), toJson(after));
         return events.save(event);
     }

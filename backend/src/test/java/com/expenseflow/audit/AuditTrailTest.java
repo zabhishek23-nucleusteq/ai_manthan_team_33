@@ -131,6 +131,43 @@ class AuditTrailTest extends AbstractIntegrationTest {
                 .isEqualTo("DRAFT");
     }
 
+    // --- events from other modules (L2's PolicyRuleChangedEvent shape) ---
+
+    record RuleChanged(String code, Long actorId, Object before, Object after) implements AuditableChange {
+        public String action() { return "POLICY_RULE_UPDATED"; }
+        public String entityType() { return AuditService.POLICY_RULE; }
+        public Object entityId() { return code; }
+    }
+
+    @Autowired org.springframework.context.ApplicationEventPublisher publisher;
+
+    @Test
+    void auditableChange_publishedInTx_recordedWithEventActor() {
+        User head = newUser("Farhan", Role.EMPLOYEE, Role.FINANCE_HEAD);
+        String code = "MEAL_DAILY_LIMIT_" + uid();
+        tx.executeWithoutResult(s -> publisher.publishEvent(
+                new RuleChanged(code, head.getId(), Map.of("limit", 1500), Map.of("limit", 1800))));
+
+        List<AuditEvent> rows = events.findByEntityTypeAndEntityIdOrderByAtAscIdAsc(AuditService.POLICY_RULE, code);
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).getAction()).isEqualTo("POLICY_RULE_UPDATED");
+        assertThat(rows.get(0).getActorId()).isEqualTo(head.getId());
+        assertThat(jdbc.queryForObject("select (before ->> 'limit') || '->' || (after ->> 'limit') from audit_events where id = ?",
+                String.class, rows.get(0).getId())).isEqualTo("1500->1800");
+    }
+
+    @Test
+    void auditableChange_rollsBackWithPublisher_andFailsOutsideTx() {
+        String code = "CAB_TRIP_LIMIT_" + uid();
+        assertThatThrownBy(() -> tx.executeWithoutResult(s -> {
+            publisher.publishEvent(new RuleChanged(code, null, null, Map.of("limit", 2500)));
+            throw new IllegalStateException("rule update failed");
+        })).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> publisher.publishEvent(new RuleChanged(code, null, null, null)))
+                .isInstanceOf(IllegalTransactionStateException.class);
+        assertThat(events.findByEntityTypeAndEntityIdOrderByAtAscIdAsc(AuditService.POLICY_RULE, code)).isEmpty();
+    }
+
     // --- idempotent replay writes one audit event (failure-modes row 1, base for T-016) ---
 
     @Test
