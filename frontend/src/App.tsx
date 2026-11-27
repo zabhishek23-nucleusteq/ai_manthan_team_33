@@ -1,6 +1,6 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Button, Result } from 'antd'
 import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router-dom'
+import { QueryProvider } from './api/QueryProvider'
 import { DesignPage } from './design/DesignPage'
 import { ThemeProvider } from './design/ThemeProvider'
 import { AuthProvider } from './features/auth/AuthProvider'
@@ -11,10 +11,6 @@ import { LandingPlaceholder } from './features/auth/LandingPlaceholder'
 import { LoginPage } from './features/auth/LoginPage'
 import { landingRouteFor } from './features/auth/roles'
 import { SignupPage } from './features/auth/SignupPage'
-
-const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
-})
 
 function NotFound() {
   return (
@@ -86,7 +82,7 @@ export function AppRoutes() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <QueryProvider>
       <ThemeProvider>
         <AuthProvider>
           <BrowserRouter>
@@ -94,6 +90,6 @@ export default function App() {
           </BrowserRouter>
         </AuthProvider>
       </ThemeProvider>
-    </QueryClientProvider>
+    </QueryProvider>
   )
 }

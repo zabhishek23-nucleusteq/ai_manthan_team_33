@@ -1,41 +1,16 @@
+import { apiFetch, isMockMode } from '../../api/client'
 import { mockAuthApi } from './mockAuth'
-import { ApiError, type ApiErrorBody, type LoginRequest, type LoginResponse, type SignupRequest, type User } from './types'
+import type { LoginRequest, LoginResponse, SignupRequest, User } from './types'
 
-export const isMockMode = (): boolean => import.meta.env.VITE_MOCK === '1'
+export { isMockMode }
 
-async function request<T>(path: string, init: RequestInit & { token?: string } = {}): Promise<T> {
-  const { token, headers, ...rest } = init
-  let res: Response
-  try {
-    res = await fetch(path, {
-      ...rest,
-      headers: {
-        Accept: 'application/json',
-        ...(rest.body ? { 'Content-Type': 'application/json' } : {}),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...headers,
-      },
-    })
-  } catch {
-    throw new ApiError(0, { code: 'NETWORK_ERROR', message: 'Cannot reach the server. Check your connection.' })
-  }
-  if (!res.ok) {
-    let body: Partial<ApiErrorBody> = {}
-    try {
-      body = (await res.json()) as ApiErrorBody
-    } catch {
-      /* non-JSON error */
-    }
-    throw new ApiError(res.status, body)
-  }
-  return (await res.json()) as T
-}
-
+// `anonymous`: no stored token and no 401 -> logout redirect (a wrong password must stay on the Login page).
 const realAuthApi = {
   login: (req: LoginRequest) =>
-    request<LoginResponse>('/api/auth/login', { method: 'POST', body: JSON.stringify(req) }),
-  signup: (req: SignupRequest) => request<User>('/api/auth/signup', { method: 'POST', body: JSON.stringify(req) }),
-  me: (token: string) => request<User>('/api/auth/me', { token }),
+    apiFetch<LoginResponse>('/api/auth/login', { method: 'POST', body: req, anonymous: true }),
+  signup: (req: SignupRequest) => apiFetch<User>('/api/auth/signup', { method: 'POST', body: req, anonymous: true }),
+  me: (token: string) =>
+    apiFetch<User>('/api/auth/me', { anonymous: true, headers: { Authorization: `Bearer ${token}` } }),
 }
 
 export const authApi = {
