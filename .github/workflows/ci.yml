@@ -71,7 +71,7 @@ jobs:
         working-directory: frontend
         run: npm audit --omit=dev --audit-level=high
       - name: Trivy scan of Maven dependencies (backend + mock-bank)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           scan-type: fs
           scan-ref: .
