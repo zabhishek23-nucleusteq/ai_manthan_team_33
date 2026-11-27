@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppRoutes } from '../../App'
 import { ThemeProvider } from '../../design/ThemeProvider'
 import { AuthProvider } from './AuthProvider'
-import { landingRouteFor, safeNext } from './roles'
+import { canOpen, landingRouteFor, postLoginTarget, safeNext } from './roles'
 import { getSession, resetSessionCacheForTests, SESSION_KEY, setSession } from './session'
 import type { Role } from './types'
 
@@ -91,6 +91,42 @@ describe('login form', () => {
     await user.type(screen.getByLabelText('Email'), 'head@expenseflow.test')
     await user.type(screen.getByLabelText('Password'), 'Demo@123{Enter}')
     await waitFor(() => expect(location()).toBe('/finance/dashboard'))
+  })
+
+  // T-509: a ?next= left behind by another role must not land the new user on the 403 page
+  it('ignores ?next= the new user may not open and lands on their own dashboard (T-509)', async () => {
+    renderApp('/login?next=%2Fclaims&expired=1')
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Email'), 'admin@expenseflow.test')
+    await user.type(screen.getByLabelText('Password'), 'Demo@123{Enter}')
+    await waitFor(() => expect(location()).toBe('/admin'))
+    expect(screen.queryByText(/do not have access/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('postLoginTarget / canOpen (T-509)', () => {
+  it('keeps ?next= when the user may open it', () => {
+    expect(postLoginTarget('/claims/42/edit', ['EMPLOYEE'])).toBe('/claims/42/edit')
+    expect(postLoginTarget('/finance/dashboard?range=7d', ['EMPLOYEE', 'FINANCE_AUDITOR'])).toBe('/finance/dashboard?range=7d')
+    expect(postLoginTarget('/design', ['SUPER_ADMIN'])).toBe('/design')
+  })
+
+  it('falls back to the landing page when the user may not open ?next=', () => {
+    expect(postLoginTarget('/claims', ['SUPER_ADMIN'])).toBe('/admin')
+    expect(postLoginTarget('/admin/users', ['EMPLOYEE', 'MANAGER'])).toBe('/manager/dashboard')
+    expect(postLoginTarget('/payouts', ['EMPLOYEE', 'FINANCE_AUDITOR'])).toBe('/finance/dashboard')
+  })
+
+  it('still rejects unsafe targets (open redirect) and missing next', () => {
+    expect(postLoginTarget('https://evil.example', ['EMPLOYEE'])).toBe('/me/dashboard')
+    expect(postLoginTarget('//evil.example', ['EMPLOYEE'])).toBe('/me/dashboard')
+    expect(postLoginTarget(null, ['FINANCE_HEAD'])).toBe('/finance/dashboard')
+  })
+
+  it('matches whole path segments, not string prefixes', () => {
+    expect(canOpen('/claimsxyz', ['SUPER_ADMIN'])).toBe(true)
+    expect(canOpen('/claims', ['SUPER_ADMIN'])).toBe(false)
+    expect(canOpen('/approvals', ['MANAGER'])).toBe(true)
   })
 })
 

@@ -6,7 +6,7 @@ import { AuthLayout } from './AuthLayout'
 import { useAuth } from './authContext'
 import { isMockAuth } from './authApi'
 import { DEMO_PASSWORD } from './mockAuth'
-import { landingRouteFor, safeNext } from './roles'
+import { postLoginTarget } from './roles'
 import { ApiError, type LoginRequest } from './types'
 
 const DEMO_ACCOUNTS: Array<[string, string]> = [
@@ -34,18 +34,19 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const next = safeNext(params.get('next'))
+  const next = params.get('next')
   const expired = params.get('expired') === '1'
   const created = params.get('created') === '1'
 
-  if (isAuthenticated) return <Navigate to={next ?? landingRouteFor(roles)} replace />
+  // T-509: honour ?next= only when this user may open it (a URL left by another role would show 403)
+  if (isAuthenticated) return <Navigate to={postLoginTarget(next, roles)} replace />
 
   const onFinish = async (values: LoginRequest) => {
     setSubmitting(true)
     setError(null)
     try {
       const user = await login(values)
-      navigate(next ?? landingRouteFor(user.roles), { replace: true })
+      navigate(postLoginTarget(next, user.roles), { replace: true })
     } catch (e) {
       setError(loginErrorMessage(e))
       form.setFieldValue('password', '')
