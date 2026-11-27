@@ -151,6 +151,8 @@ public class SeedService {
     private U head, admin, priya, rahul, anita, meera;
     private final List<U> auditors = new ArrayList<>();
     private int receiptSeq = 0;
+    /** T-510: rotates the planted REJECT kind so the duplicate counts do not depend on the RNG stream / today's date. */
+    private int rejectSeq = 0;
 
     public SeedService(JdbcTemplate jdbc, PasswordEncoder passwordEncoder, PolicyService policyService, JsonMapper json) {
         this.jdbc = jdbc;
@@ -183,7 +185,7 @@ public class SeedService {
         faker = new Faker(Locale.forLanguageTag("en-IND"), new Random(42));
         now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
         users.clear(); receipts.clear(); claims.clear(); mealsByEmp.clear(); lineKeys.clear();
-        countedLines.clear(); countedReceipts.clear(); auditors.clear(); receiptSeq = 0;
+        countedLines.clear(); countedReceipts.clear(); auditors.clear(); receiptSeq = 0; rejectSeq = 0;
     }
 
     // ------------------------------------------------------------------ users
@@ -560,7 +562,8 @@ public class SeedService {
                 out.add(line(ExpenseCategory.TRAVEL, weekdayBefore(s, 8), between(45000, 90000), vendor(ExpenseCategory.TRAVEL), o, true));
             }
             case REJECT -> {
-                int kind = rnd.nextInt(100);
+                // deterministic 45/30/25 split (missing receipt / duplicate line / duplicate receipt), see T-510
+                int kind = (rejectSeq++ % 20) * 5;
                 if (kind < 45 || countedLines.isEmpty()) {
                     // BR-5: missing receipt above 500
                     out.add(line(ExpenseCategory.OTHER, weekdayBefore(s, 4), between(500.01, 3200), vendor(ExpenseCategory.OTHER), o, false));
