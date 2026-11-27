@@ -39,7 +39,7 @@ interface SampleClaim {
 /** Synthetic sample rows for the showcase only. */
 const SAMPLE_CLAIMS: SampleClaim[] = [
   { key: '1', id: 'DEMO-1001', title: 'Client visit taxi', category: 'Travel', amount: 1250, status: 'DRAFT' },
-  { key: '2', id: 'DEMO-1002', title: 'Team lunch', category: 'Meals', amount: 4800, status: 'PENDING_APPROVAL' },
+  { key: '2', id: 'DEMO-1002', title: 'Team lunch', category: 'Meals', amount: 4800, status: 'PENDING_MANAGER' },
   { key: '3', id: 'DEMO-1003', title: 'Conference ticket', category: 'Training', amount: 26000, status: 'APPROVED' },
   { key: '4', id: 'DEMO-1004', title: 'Hotel stay', category: 'Lodging', amount: 9200, status: 'CLARIFICATION_REQUESTED' },
   { key: '5', id: 'DEMO-1005', title: 'Laptop bag', category: 'Equipment', amount: 3100, status: 'REJECTED' },
