@@ -28,6 +28,7 @@ services:
       mock-bank:
         condition: service_started
     environment:
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:${FRONTEND_PORT:-3000},http://localhost:5173}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-seed}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-expenseflow}
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-expenseflow}
