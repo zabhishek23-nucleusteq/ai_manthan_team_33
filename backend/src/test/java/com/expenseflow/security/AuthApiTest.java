@@ -168,6 +168,26 @@ class AuthApiTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void login_bruteForce_throttledWith429_evenForCorrectPassword() throws Exception {
+        String email = email();
+        signup(email, "Demo@1234");
+        for (int i = 0; i < 5; i++) {
+            HttpResponse<String> res = login(email, "Wrong@" + i + "234");
+            assertThat(res.statusCode()).as("attempt %d", i + 1).isEqualTo(401);
+            assertThat(res.body()).contains("INVALID_CREDENTIALS");
+        }
+        HttpResponse<String> blocked = login(email, "Demo@1234");
+        assertThat(blocked.statusCode()).isEqualTo(429);
+        assertThat(blocked.body()).contains("\"code\":\"TOO_MANY_REQUESTS\"");
+        assertThat(blocked.headers().firstValue("Retry-After")).hasValueSatisfying(v ->
+                assertThat(Long.parseLong(v)).isBetween(1L, 61L));
+        // other accounts are not affected
+        String other = email();
+        signup(other, "Demo@1234");
+        assertThat(login(other, "Demo@1234").statusCode()).isEqualTo(200);
+    }
+
+    @Test
     void me_withoutToken_401() throws Exception {
         HttpResponse<String> res = get("/api/auth/me", null);
         assertThat(res.statusCode()).isEqualTo(401);
