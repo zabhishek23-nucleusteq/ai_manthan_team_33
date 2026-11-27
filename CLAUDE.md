@@ -55,6 +55,43 @@ tests/e2e/          Playwright specs
 docs/               problem/, requirements.md, architecture/, adr/, milestones/, ux/, testing/, sre/, claude-journal/
 ```
 
-## 6. Project specifics
-<!-- L1 fills this during /squad-kickoff: glossary, state machine, business rules BR-1.., invariants, milestones. -->
-_Not filled yet - waiting for kickoff._
+## 6. Project specifics - ExpenseFlow
+Full detail: `docs/requirements.md` (FR/BR/NFR/seed), `docs/architecture/` (README, rbac.md, failure-modes.md), `docs/adr/`, `contracts/openapi.yaml`. Base package `com.expenseflow`.
+
+### Glossary
+- **Claim**: one expense report (code `EXP-000123`, demo `DEMO-1001`) with 1..50 **lines** (category MEAL/HOTEL/CAB/TRAVEL/OTHER, amount, expense date, vendor, city+nights for HOTEL, receipt).
+- **Policy engine**: runs every enabled rule in table `policy_rules` on every line -> outcome **AUTO_APPROVED / ROUTED / AUTO_REJECTED** + violation codes. Rules are config, not code constants (ADR-002).
+- **Chain**: approval steps MANAGER -> AUDITOR (> 25,000) -> HEAD (> 1,00,000) (ADR-001). **Delegation**: approver's steps go to a delegate for a date range. **Send back**: CLARIFICATION_REQUESTED.
+- **Audit queue**: auditor's filtered list (PENDING_AUDITOR + sample audits) with bulk approve. **Sample audit**: random 10% of auto-approved claims.
+- **Payout batch**: APPROVED claims -> CSV bank file -> mock bank (`services/mock-bank`) -> PAID.
+
+### Roles (rbac.md)
+EMPLOYEE (self sign-up) · MANAGER · FINANCE_AUDITOR · FINANCE_HEAD (+SUPER_ADMIN on demo user) · SUPER_ADMIN. Demo logins `employee|manager|manager2|auditor|head|admin@expenseflow.test` / `Demo@123`.
+
+### State machine
+`DRAFT -submit-> AUTO_REJECTED | APPROVED (auto) | PENDING_MANAGER -> [PENDING_AUDITOR] -> [PENDING_HEAD] -> APPROVED -> IN_PAYOUT -> PAID`; any PENDING_x -> REJECTED | CLARIFICATION_REQUESTED (-> resubmit = submit again, restart at MANAGER); APPROVED -> REJECTED on sample-audit EXCEPTION; IN_PAYOUT -> APPROVED only when a failed batch is cancelled. Terminal: AUTO_REJECTED, REJECTED, PAID.
+
+### Business rules (exact values; "above" = strictly greater; BigDecimal compareTo)
+- BR-1 Meals <= 1,500 INR per employee per day (sum across claims) -> `MEAL_DAILY_LIMIT` ROUTE
+- BR-2/3 Hotel <= 6,000 per night tier-1 (Mumbai, Delhi, Bengaluru, Chennai, Kolkata, Hyderabad, Pune, Ahmedabad), 4,000 others (amount/nights) -> `HOTEL_NIGHTLY_LIMIT` ROUTE
+- BR-4 Cab <= 2,000 per line (trip) -> `CAB_TRIP_LIMIT` ROUTE
+- BR-5 Receipt mandatory when amount > 500 -> `RECEIPT_REQUIRED` REJECT
+- BR-6 Same vendor (trim, case-insensitive) + amount + date as an earlier non-rejected line -> `DUPLICATE_LINE` REJECT
+- BR-7 Same receipt SHA-256 as an earlier non-rejected line -> `DUPLICATE_RECEIPT` REJECT
+- BR-8 Saturday/Sunday expense -> `WEEKEND_SPEND` ROUTE (manager attention tag)
+- BR-9 Any REJECT -> AUTO_REJECTED; else any ROUTE -> ROUTED; else total <= 5,000 -> AUTO_APPROVED; else ROUTED
+- BR-10..12 Chain: MANAGER always; + AUDITOR if total > 25,000; + HEAD if total > 1,00,000
+- BR-13 Sample audit 10% of AUTO_APPROVED · BR-14 delegation: same-or-higher approver role, never the claimant, one hop, <= 30 days
+- BR-15 No self-approval -> escalate to next level · BR-16 resubmit re-runs policy, restarts at MANAGER
+- BR-17 Bank CSV format (requirements.md) · BR-18 payable = APPROVED, sample audit not PENDING/EXCEPTION, not in a batch · BR-19 avg approval hours = submitted -> final human decision
+- BR-20 Receipt PDF/JPG/PNG <= 5 MB · BR-21 seed 150 employees, 8 departments, 3,000 claims
+
+### Invariants
+1. Employee sees only own claims (others -> 404). 2. Approver never acts on own claim. 3. Only the assigned approver (or active delegate) acts on an open step. 4. Lines are editable only in DRAFT/CLARIFICATION_REQUESTED. 5. A claim is in at most one payout batch and is paid once. 6. `audit_events` is append-only (DB trigger) and every state change writes one in the same transaction. 7. Every state-changing POST takes `Idempotency-Key`. 8. Policy results are stored with a rule snapshot; rule changes do not rewrite history. 9. Every KPI endpoint takes `from`/`to` (NFR-DASH).
+
+### Sprint plan (build window 3 hours; sprint = 1 hour; review gate T-90x at the end of each)
+| Sprint | Hour | Showable result |
+|---|---|---|
+| S1 | hour 1 | Architecture pack (diagrams, state machine, rbac, 2 ADRs, contract, failure modes), wireframes, `/design` theme page, one-command start (db + backend health + frontend), CI first run, login/sign-up with JWT and each role on its own placeholder dashboard, audit + idempotency base |
+| S2 | hour 2 | Seeded data (150 users, 3,000 claims); employee creates claim with receipts -> policy engine outcome with reasons; manager/auditor/head chain with send-back + delegation and receipt viewer; auditor queue with filters, bulk approve, sample audit; RBAC tests; Prometheus + Grafana up |
+| S3 | hour 3 | Payout batch -> CSV -> mock bank -> PAID; role dashboards with 1D/7D/1M/Custom on seed data; super admin (users, overview, audit, health); metrics + alert + runbook + drill RCA; 10 E2E cases; README + demo. **Feature freeze at 2h30** |

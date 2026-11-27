@@ -1,0 +1,848 @@
+openapi: 3.1.0
+info:
+  title: ExpenseFlow API
+  version: 1.0.0
+  description: |
+    Expense claims with a configurable policy engine, multi-level approvals, audit queue and payout export.
+    Roles per docs/architecture/rbac.md. Business rules per docs/requirements.md (BR-n).
+    All money values are INR decimals with 2 places. Timestamps are ISO-8601 UTC.
+    Errors always use the Error schema with a stable `code`:
+    UNAUTHENTICATED(401) FORBIDDEN(403) NOT_ASSIGNED_APPROVER(403) SELF_APPROVAL_FORBIDDEN(403) NOT_FOUND(404)
+    VALIDATION_FAILED(400) INVALID_RANGE(400) INVALID_CREDENTIALS(401) EMAIL_TAKEN(409) ILLEGAL_STATE_TRANSITION(409)
+    CONCURRENT_MODIFICATION(409) CANNOT_REMOVE_OWN_ADMIN(409) RECEIPT_TOO_LARGE(413) UNSUPPORTED_FILE_TYPE(415)
+    CLAIM_EMPTY(422) IDEMPOTENCY_KEY_REUSED(422) DELEGATION_INVALID(422) NO_ELIGIBLE_CLAIMS(422) BANK_UNAVAILABLE(502)
+servers:
+  - url: http://localhost:8080
+security:
+  - bearerAuth: []
+tags:
+  - name: auth
+  - name: claims
+  - name: approvals
+  - name: audit-queue
+  - name: payouts
+  - name: policy
+  - name: dashboard
+  - name: admin
+  - name: reference
+
+paths:
+  /api/auth/signup:
+    post:
+      tags: [auth]
+      security: []
+      summary: Self sign-up (always EMPLOYEE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SignupRequest' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/auth/login:
+    post:
+      summary: POST /api/auth/login
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+            example: { email: employee@expenseflow.test, password: Demo@123 }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LoginResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/auth/me:
+    get:
+      summary: GET /api/auth/me
+      tags: [auth]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/claims:
+    get:
+      tags: [claims]
+      summary: My claims (owner only, FR-14)
+      parameters:
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/ClaimStatus' } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ClaimSummaryPage' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [claims]
+      summary: Create draft claim (FR-2)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClaimInput' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Claim' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/claims/{id}:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    get:
+      tags: [claims]
+      summary: Claim detail (owner, assigned approvers, AUDITOR, HEAD; others 404)
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Claim' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [claims]
+      summary: Replace title + lines (only DRAFT / CLARIFICATION_REQUESTED)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClaimInput' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Claim' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [claims]
+      summary: Delete draft
+      responses:
+        '204': { description: Deleted }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/claims/{id}/submit:
+    parameters: [ { $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+    post:
+      tags: [claims]
+      summary: Submit / resubmit; runs the policy engine (FR-4, BR-1..BR-9)
+      responses:
+        '200':
+          description: Claim after policy evaluation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Claim' }
+              example:
+                id: 42
+                code: DEMO-1003
+                status: AUTO_REJECTED
+                total: 1200.00
+                policyResult:
+                  outcome: AUTO_REJECTED
+                  reasons: [ "Line 1: receipt is mandatory above 500 INR" ]
+                  lineResults:
+                    - lineId: 7
+                      violations: [ { code: RECEIPT_REQUIRED, action: REJECT, message: "Receipt is mandatory above 500 INR (amount 1,200.00)" } ]
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /api/claims/{id}/audit:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    get:
+      tags: [claims]
+      summary: Audit timeline of a claim (FR-13)
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AuditEvent' } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/claims/{id}/comments:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    get:
+      summary: GET /api/claims/{id}/comments
+      tags: [claims]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Comment' } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      summary: POST /api/claims/{id}/comments
+      tags: [claims]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [text], properties: { text: { type: string, minLength: 1, maxLength: 2000 } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Comment' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/receipts:
+    post:
+      tags: [claims]
+      summary: Upload receipt (PDF/JPG/PNG, max 5 MB, BR-20)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { type: object, required: [file], properties: { file: { type: string, format: binary } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Receipt' } } } }
+        '413': { $ref: '#/components/responses/Error' }
+        '415': { $ref: '#/components/responses/Error' }
+  /api/receipts/{id}/content:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    get:
+      tags: [claims]
+      summary: Receipt bytes for the side-by-side viewer
+      responses:
+        '200':
+          description: File
+          content:
+            application/pdf: { schema: { type: string, format: binary } }
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/png: { schema: { type: string, format: binary } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/approvals/inbox:
+    get:
+      tags: [approvals]
+      summary: Open steps assigned to me (incl. delegated)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ApprovalTaskPage' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/approvals/{claimId}/approve:
+    parameters: [ { $ref: '#/components/parameters/ClaimId' }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+    post:
+      summary: POST /api/approvals/{claimId}/approve
+      tags: [approvals]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DecisionInput' }
+      responses:
+        '200': { description: Claim after decision, content: { application/json: { schema: { $ref: '#/components/schemas/Claim' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/approvals/{claimId}/reject:
+    parameters: [ { $ref: '#/components/parameters/ClaimId' }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+    post:
+      summary: POST /api/approvals/{claimId}/reject
+      tags: [approvals]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DecisionInputRequired' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Claim' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/approvals/{claimId}/send-back:
+    parameters: [ { $ref: '#/components/parameters/ClaimId' }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+    post:
+      tags: [approvals]
+      summary: Send back for clarification (FR-7)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DecisionInputRequired' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Claim' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/delegations:
+    get:
+      tags: [approvals]
+      summary: My delegations (given and received)
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Delegation' } } } } }
+    post:
+      summary: POST /api/delegations
+      tags: [approvals]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DelegationInput' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Delegation' } } } }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /api/delegations/{id}:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    delete:
+      summary: DELETE /api/delegations/{id}
+      tags: [approvals]
+      responses:
+        '204': { description: Revoked }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/audit-queue:
+    get:
+      tags: [audit-queue]
+      summary: Auditor review queue (PENDING_AUDITOR + sample audits) with filters (FR-9)
+      parameters:
+        - { name: departmentId, in: query, schema: { type: integer } }
+        - { name: category, in: query, schema: { $ref: '#/components/schemas/Category' } }
+        - { name: minAmount, in: query, schema: { type: number } }
+        - { name: maxAmount, in: query, schema: { type: number } }
+        - { name: violation, in: query, schema: { $ref: '#/components/schemas/ViolationCode' } }
+        - { name: sampleOnly, in: query, schema: { type: boolean, default: false } }
+        - { name: olderThanHours, in: query, schema: { type: integer } }
+        - { name: sort, in: query, schema: { type: string, enum: [submittedAt, total, -submittedAt, -total], default: submittedAt } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ApprovalTaskPage' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/audit-queue/bulk-approve:
+    parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+    post:
+      summary: POST /api/audit-queue/bulk-approve
+      tags: [audit-queue]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [claimIds]
+              properties:
+                claimIds: { type: array, minItems: 1, maxItems: 100, items: { type: integer } }
+                comment: { type: string }
+      responses:
+        '200':
+          description: Per-item result (partial success allowed)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items: { type: object, properties: { claimId: { type: integer }, ok: { type: boolean }, code: { type: string }, status: { $ref: '#/components/schemas/ClaimStatus' } } }
+              example: { results: [ { claimId: 5, ok: true, status: APPROVED }, { claimId: 9, ok: false, code: CONCURRENT_MODIFICATION } ] }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/audit-queue/{claimId}/sample-audit:
+    parameters: [ { $ref: '#/components/parameters/ClaimId' } ]
+    post:
+      tags: [audit-queue]
+      summary: Record sample audit result (FR-10)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [result], properties: { result: { type: string, enum: [OK, EXCEPTION] }, comment: { type: string } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Claim' } } } }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/payout-batches:
+    get:
+      summary: GET /api/payout-batches
+      tags: [payouts]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/PayoutBatch' } }, page: { type: integer }, size: { type: integer }, total: { type: integer } } } } } }
+    post:
+      tags: [payouts]
+      summary: Create batch from all payable claims (BR-18)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/PayoutBatch' } } } }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /api/payout-batches/{id}:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    get:
+      summary: GET /api/payout-batches/{id}
+      tags: [payouts]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/PayoutBatch' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/payout-batches/{id}/export.csv:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    get:
+      tags: [payouts]
+      summary: Mock bank file (BR-17)
+      responses:
+        '200':
+          description: CSV
+          content:
+            text/csv:
+              schema: { type: string }
+              example: |
+                RECORD_TYPE,BATCH_ID,VALUE_DATE,EMPLOYEE_CODE,BENEFICIARY_NAME,ACCOUNT_NO,IFSC,AMOUNT,CURRENCY,NARRATION
+                D,PB-0007,2026-11-28,EMP0042,Priya Employee,000123456789,SYNB0000123,1250.00,INR,DEMO-1008
+                T,PB-0007,2026-11-28,1,1250.00
+  /api/payout-batches/{id}/submit:
+    parameters: [ { $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IdempotencyKey' } ]
+    post:
+      tags: [payouts]
+      summary: Send file to mock bank; accepted -> batch + claims PAID
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/PayoutBatch' } } } }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/Error' }
+
+  /api/policy-rules:
+    get:
+      summary: GET /api/policy-rules
+      tags: [policy]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PolicyRule' } } } } }
+  /api/policy-rules/{code}:
+    parameters: [ { name: code, in: path, required: true, schema: { type: string } } ]
+    put:
+      summary: PUT /api/policy-rules/{code}
+      tags: [policy]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PolicyRuleInput' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/PolicyRule' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/dashboard/kpis:
+    get:
+      tags: [dashboard]
+      summary: KPIs scoped by role (EMP own, MGR direct reports, finance/admin all) - NFR-DASH
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - { name: departmentId, in: query, schema: { type: integer }, description: finance/admin only }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Kpis' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/telemetry/page-load:
+    post:
+      tags: [dashboard]
+      summary: UI reports page load time (metric expenseflow_page_load_seconds)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [route, ms], properties: { route: { type: string, maxLength: 100 }, ms: { type: integer, minimum: 0, maximum: 120000 } } }
+      responses:
+        '204': { description: Recorded }
+
+  /api/departments:
+    get:
+      summary: GET /api/departments
+      tags: [reference]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Department' } } } } }
+  /api/users/approvers:
+    get:
+      tags: [reference]
+      summary: Users holding an approver role (delegate picker)
+      parameters: [ { name: q, in: query, schema: { type: string } } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/UserRef' } } } } }
+
+  /api/admin/users:
+    get:
+      summary: GET /api/admin/users
+      tags: [admin]
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: role, in: query, schema: { $ref: '#/components/schemas/Role' } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/User' } }, page: { type: integer }, size: { type: integer }, total: { type: integer } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin]
+      summary: Create staff user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminUserInput' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/admin/users/{id}/roles:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    put:
+      summary: PUT /api/admin/users/{id}/roles
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [roles], properties: { roles: { type: array, items: { $ref: '#/components/schemas/Role' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/admin/users/{id}:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    patch:
+      summary: PATCH /api/admin/users/{id}
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { enabled: { type: boolean }, managerId: { type: integer }, departmentId: { type: integer } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/admin/overview:
+    get:
+      summary: GET /api/admin/overview
+      tags: [admin]
+      parameters: [ { $ref: '#/components/parameters/From' }, { $ref: '#/components/parameters/To' } ]
+      responses:
+        '200':
+          description: System-wide KPIs + user counts
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Kpis'
+                  - type: object
+                    properties:
+                      usersByRole: { type: object, additionalProperties: { type: integer } }
+                      activeUsers: { type: integer }
+  /api/admin/audit:
+    get:
+      summary: GET /api/admin/audit
+      tags: [admin]
+      parameters:
+        - { name: actorId, in: query, schema: { type: integer } }
+        - { name: action, in: query, schema: { type: string } }
+        - { name: entityType, in: query, schema: { type: string } }
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/AuditEvent' } }, page: { type: integer }, size: { type: integer }, total: { type: integer } } } } } }
+  /api/admin/health:
+    get:
+      summary: GET /api/admin/health
+      tags: [admin]
+      responses:
+        '200':
+          description: Status of backend, db, mock bank + error rate
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  services: { type: array, items: { type: object, properties: { name: { type: string }, status: { type: string, enum: [UP, DOWN, DEGRADED] }, latencyMs: { type: integer } } } }
+                  errorRate5m: { type: number, description: share of 5xx responses in last 5 minutes }
+                  oldestPendingApprovalHours: { type: number }
+              example: { services: [ { name: backend, status: UP, latencyMs: 3 }, { name: database, status: UP, latencyMs: 2 }, { name: mock-bank, status: DOWN, latencyMs: 2000 } ], errorRate5m: 0.01, oldestPendingApprovalHours: 51.5 }
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    Id: { name: id, in: path, required: true, schema: { type: integer } }
+    ClaimId: { name: claimId, in: path, required: true, schema: { type: integer } }
+    Page: { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+    Size: { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+    IdempotencyKey: { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 8, maxLength: 64 }, description: 'UUID per user action; replay returns the stored response (NFR-IDEM)' }
+    From: { name: from, in: query, required: true, schema: { type: string, format: date-time }, description: inclusive, example: '2026-11-20T00:00:00Z' }
+    To: { name: to, in: query, required: true, schema: { type: string, format: date-time }, description: 'exclusive; to - from <= 366 days else 400 INVALID_RANGE', example: '2026-11-27T00:00:00Z' }
+  responses:
+    BadRequest: { description: Validation failed / invalid range, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Unauthorized: { description: No or invalid token / bad credentials, content: { application/json: { schema: { $ref: '#/components/schemas/Error' }, example: { code: UNAUTHENTICATED, message: Authentication required } } } }
+    Forbidden: { description: Role not allowed, content: { application/json: { schema: { $ref: '#/components/schemas/Error' }, example: { code: FORBIDDEN, message: Access denied } } } }
+    NotFound: { description: Not found (or not yours), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Conflict: { description: Illegal state / concurrent change / duplicate, content: { application/json: { schema: { $ref: '#/components/schemas/Error' }, example: { code: ILLEGAL_STATE_TRANSITION, message: 'Claim DEMO-1008 is APPROVED; cannot approve', details: { from: APPROVED, action: approve } } } } }
+    Unprocessable: { description: Business rule refused, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Error: { description: Error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: { type: object, additionalProperties: true }
+    Role: { type: string, enum: [EMPLOYEE, MANAGER, FINANCE_AUDITOR, FINANCE_HEAD, SUPER_ADMIN] }
+    ClaimStatus: { type: string, enum: [DRAFT, AUTO_REJECTED, PENDING_MANAGER, PENDING_AUDITOR, PENDING_HEAD, CLARIFICATION_REQUESTED, APPROVED, REJECTED, IN_PAYOUT, PAID] }
+    Category: { type: string, enum: [MEAL, HOTEL, CAB, TRAVEL, OTHER] }
+    ViolationCode: { type: string, enum: [MEAL_DAILY_LIMIT, HOTEL_NIGHTLY_LIMIT, CAB_TRIP_LIMIT, RECEIPT_REQUIRED, DUPLICATE_LINE, DUPLICATE_RECEIPT, WEEKEND_SPEND] }
+    ApprovalLevel: { type: string, enum: [MANAGER, AUDITOR, HEAD] }
+    SignupRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name: { type: string, minLength: 2, maxLength: 100 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8, maxLength: 100 }
+        departmentId: { type: integer }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties: { email: { type: string, format: email }, password: { type: string } }
+    LoginResponse:
+      type: object
+      required: [accessToken, tokenType, expiresIn, user]
+      properties:
+        accessToken: { type: string }
+        tokenType: { type: string, const: Bearer }
+        expiresIn: { type: integer, description: seconds, example: 28800 }
+        user: { $ref: '#/components/schemas/User' }
+    UserRef:
+      type: object
+      properties: { id: { type: integer }, name: { type: string }, email: { type: string } }
+    User:
+      type: object
+      required: [id, name, email, roles]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+        employeeCode: { type: string, example: EMP0042 }
+        roles: { type: array, items: { $ref: '#/components/schemas/Role' } }
+        department: { $ref: '#/components/schemas/Department' }
+        manager: { $ref: '#/components/schemas/UserRef' }
+        enabled: { type: boolean }
+    AdminUserInput:
+      type: object
+      required: [name, email, password, roles]
+      properties:
+        name: { type: string }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        roles: { type: array, minItems: 1, items: { $ref: '#/components/schemas/Role' } }
+        departmentId: { type: integer }
+        managerId: { type: integer }
+    Department:
+      type: object
+      properties: { id: { type: integer }, name: { type: string } }
+    Receipt:
+      type: object
+      properties:
+        id: { type: integer }
+        fileName: { type: string }
+        contentType: { type: string }
+        size: { type: integer }
+        sha256: { type: string }
+    ClaimLineInput:
+      type: object
+      required: [category, amount, expenseDate, vendor]
+      properties:
+        category: { $ref: '#/components/schemas/Category' }
+        amount: { type: number, exclusiveMinimum: 0, maximum: 10000000 }
+        expenseDate: { type: string, format: date, description: not in the future }
+        vendor: { type: string, maxLength: 120 }
+        description: { type: string, maxLength: 500 }
+        city: { type: string, description: required for HOTEL }
+        nights: { type: integer, minimum: 1, maximum: 30, description: required for HOTEL }
+        receiptId: { type: integer }
+    ClaimInput:
+      type: object
+      required: [title, lines]
+      properties:
+        title: { type: string, minLength: 3, maxLength: 120 }
+        lines: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/ClaimLineInput' } }
+      example:
+        title: Client visit Pune
+        lines:
+          - { category: HOTEL, amount: 12000.00, expenseDate: '2026-11-20', vendor: Hotel Sunrise, city: Pune, nights: 2, receiptId: 11 }
+          - { category: MEAL, amount: 900.00, expenseDate: '2026-11-21', vendor: Cafe Blue, receiptId: 12 }
+    Violation:
+      type: object
+      properties:
+        code: { $ref: '#/components/schemas/ViolationCode' }
+        action: { type: string, enum: [ROUTE, REJECT] }
+        message: { type: string }
+    ClaimLine:
+      allOf:
+        - $ref: '#/components/schemas/ClaimLineInput'
+        - type: object
+          properties:
+            id: { type: integer }
+            receipt: { $ref: '#/components/schemas/Receipt' }
+            violations: { type: array, items: { $ref: '#/components/schemas/Violation' } }
+    PolicyResult:
+      type: object
+      properties:
+        outcome: { type: string, enum: [AUTO_APPROVED, ROUTED, AUTO_REJECTED] }
+        reasons: { type: array, items: { type: string } }
+        lineResults: { type: array, items: { type: object, properties: { lineId: { type: integer }, violations: { type: array, items: { $ref: '#/components/schemas/Violation' } } } } }
+        requiredLevels: { type: array, items: { $ref: '#/components/schemas/ApprovalLevel' } }
+    ApprovalStep:
+      type: object
+      properties:
+        level: { $ref: '#/components/schemas/ApprovalLevel' }
+        assignee: { $ref: '#/components/schemas/UserRef' }
+        actedBy: { $ref: '#/components/schemas/UserRef' }
+        onBehalfOf: { $ref: '#/components/schemas/UserRef' }
+        decision: { type: string, enum: [PENDING, APPROVED, REJECTED, SENT_BACK, SUPERSEDED] }
+        comment: { type: string }
+        createdAt: { type: string, format: date-time }
+        decidedAt: { type: string, format: date-time }
+    Claim:
+      type: object
+      required: [id, code, status, total, lines]
+      properties:
+        id: { type: integer }
+        code: { type: string, example: DEMO-1004 }
+        title: { type: string }
+        status: { $ref: '#/components/schemas/ClaimStatus' }
+        total: { type: number }
+        employee: { $ref: '#/components/schemas/UserRef' }
+        department: { $ref: '#/components/schemas/Department' }
+        lines: { type: array, items: { $ref: '#/components/schemas/ClaimLine' } }
+        policyResult: { $ref: '#/components/schemas/PolicyResult' }
+        steps: { type: array, items: { $ref: '#/components/schemas/ApprovalStep' } }
+        sampleAudit: { type: string, enum: [NONE, PENDING, OK, EXCEPTION] }
+        createdAt: { type: string, format: date-time }
+        submittedAt: { type: string, format: date-time }
+        decidedAt: { type: string, format: date-time }
+        version: { type: integer }
+    ClaimSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        title: { type: string }
+        status: { $ref: '#/components/schemas/ClaimStatus' }
+        total: { type: number }
+        lineCount: { type: integer }
+        violationCodes: { type: array, items: { $ref: '#/components/schemas/ViolationCode' } }
+        submittedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ClaimSummaryPage:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ClaimSummary' } }
+        page: { type: integer }
+        size: { type: integer }
+        total: { type: integer }
+    ApprovalTask:
+      type: object
+      properties:
+        claimId: { type: integer }
+        code: { type: string }
+        title: { type: string }
+        employee: { $ref: '#/components/schemas/UserRef' }
+        department: { $ref: '#/components/schemas/Department' }
+        total: { type: number }
+        level: { $ref: '#/components/schemas/ApprovalLevel' }
+        onBehalfOf: { $ref: '#/components/schemas/UserRef' }
+        violationCodes: { type: array, items: { $ref: '#/components/schemas/ViolationCode' } }
+        sampleAudit: { type: boolean }
+        submittedAt: { type: string, format: date-time }
+        ageHours: { type: number }
+    ApprovalTaskPage:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ApprovalTask' } }
+        page: { type: integer }
+        size: { type: integer }
+        total: { type: integer }
+    DecisionInput:
+      type: object
+      properties: { comment: { type: string, maxLength: 2000 } }
+    DecisionInputRequired:
+      type: object
+      required: [comment]
+      properties: { comment: { type: string, minLength: 3, maxLength: 2000 } }
+    Comment:
+      type: object
+      properties:
+        id: { type: integer }
+        author: { $ref: '#/components/schemas/UserRef' }
+        text: { type: string }
+        createdAt: { type: string, format: date-time }
+    DelegationInput:
+      type: object
+      required: [delegateId, from, to]
+      properties:
+        delegateId: { type: integer }
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+    Delegation:
+      type: object
+      properties:
+        id: { type: integer }
+        delegator: { $ref: '#/components/schemas/UserRef' }
+        delegate: { $ref: '#/components/schemas/UserRef' }
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        active: { type: boolean }
+    PayoutBatch:
+      type: object
+      properties:
+        id: { type: integer }
+        code: { type: string, example: PB-0007 }
+        status: { type: string, enum: [CREATED, SUBMITTED, PAID, SUBMIT_FAILED, CANCELLED] }
+        itemCount: { type: integer }
+        total: { type: number }
+        valueDate: { type: string, format: date }
+        bankReference: { type: string }
+        lastError: { type: string }
+        createdAt: { type: string, format: date-time }
+        items: { type: array, items: { type: object, properties: { claimId: { type: integer }, claimCode: { type: string }, employee: { $ref: '#/components/schemas/UserRef' }, amount: { type: number } } } }
+    PolicyRule:
+      type: object
+      properties:
+        code: { type: string, example: MEAL_DAILY_LIMIT }
+        description: { type: string }
+        category: { $ref: '#/components/schemas/Category' }
+        limitAmount: { type: number }
+        unit: { type: string, enum: [PER_DAY, PER_NIGHT, PER_TRIP, PER_LINE, PER_CLAIM, RATE] }
+        params: { type: object, additionalProperties: true }
+        action: { type: string, enum: [ROUTE, REJECT, CONFIG] }
+        enabled: { type: boolean }
+        updatedAt: { type: string, format: date-time }
+    PolicyRuleInput:
+      type: object
+      properties:
+        limitAmount: { type: number, minimum: 0 }
+        params: { type: object, additionalProperties: true }
+        action: { type: string, enum: [ROUTE, REJECT] }
+        enabled: { type: boolean }
+    AuditEvent:
+      type: object
+      properties:
+        id: { type: integer }
+        at: { type: string, format: date-time }
+        actor: { $ref: '#/components/schemas/UserRef' }
+        onBehalfOf: { $ref: '#/components/schemas/UserRef' }
+        action: { type: string, example: CLAIM_APPROVED }
+        entityType: { type: string, example: CLAIM }
+        entityId: { type: string }
+        before: { type: object, additionalProperties: true }
+        after: { type: object, additionalProperties: true }
+    Bucket:
+      type: object
+      properties: { start: { type: string, format: date-time }, spend: { type: number }, claims: { type: integer } }
+    Kpis:
+      type: object
+      properties:
+        range:
+          type: object
+          properties:
+            from: { type: string, format: date-time }
+            to: { type: string, format: date-time }
+            bucket: { type: string, enum: [HOUR, DAY, WEEK] }
+        scope: { type: string, enum: [OWN, TEAM, ALL] }
+        totals:
+          type: object
+          properties:
+            spend: { type: number, description: 'sum of totals of claims submitted in range, excl. DRAFT and rejected' }
+            claims: { type: integer }
+            pendingApprovals: { type: integer }
+            violations: { type: integer }
+            autoApprovedRate: { type: number }
+            avgApprovalHours: { type: number, description: BR-19 }
+        spendByCategory: { type: array, items: { type: object, properties: { category: { $ref: '#/components/schemas/Category' }, spend: { type: number } } } }
+        spendByDepartment: { type: array, items: { type: object, properties: { department: { type: string }, spend: { type: number } } } }
+        spendByMonth: { type: array, items: { type: object, properties: { month: { type: string, example: '2026-11' }, spend: { type: number } } } }
+        series: { type: array, items: { $ref: '#/components/schemas/Bucket' } }
+        violationsByRule: { type: array, items: { type: object, properties: { code: { $ref: '#/components/schemas/ViolationCode' }, count: { type: integer } } } }
+        approvalTimeByLevel: { type: array, items: { type: object, properties: { level: { $ref: '#/components/schemas/ApprovalLevel' }, avgHours: { type: number } } } }
