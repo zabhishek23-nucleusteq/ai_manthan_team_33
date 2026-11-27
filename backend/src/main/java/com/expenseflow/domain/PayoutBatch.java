@@ -58,6 +58,13 @@ public class PayoutBatch {
     @Column(name = "submitted_at")
     private Instant submittedAt;
 
+    /** Last bank submit problem (SUBMIT_FAILED reason or rows the bank rejected); null when fine. */
+    @Column(name = "last_error", length = 1000)
+    private String lastError;
+
+    @Column(name = "bank_file_id", length = 80)
+    private String bankFileId;
+
     @Version
     @Column(nullable = false)
     private long version;
@@ -99,5 +106,18 @@ public class PayoutBatch {
     public Instant getSubmittedAt() { return submittedAt; }
     public void setSubmittedAt(Instant submittedAt) { this.submittedAt = submittedAt; }
     public long getVersion() { return version; }
+    public String getLastError() { return lastError; }
+    public void setLastError(String lastError) { this.lastError = lastError == null || lastError.length() <= 1000 ? lastError : lastError.substring(0, 1000); }
+    public String getBankFileId() { return bankFileId; }
+    public void setBankFileId(String bankFileId) { this.bankFileId = bankFileId; }
+    /** Batch code shown to users and in the bank file (BR-17), e.g. PB-0007. */
+    public String code() { return String.format("PB-%04d", id); }
+
+    /** Drops a claim the bank rejected so it can go into a later batch (BR-18: never paid twice). */
+    public void removeItemFor(Long claimId) {
+        items.removeIf(i -> i.getClaim().getId().equals(claimId));
+        itemCount = items.size();
+        total = items.stream().map(PayoutItem::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
     public List<PayoutItem> getItems() { return Collections.unmodifiableList(items); }
 }
