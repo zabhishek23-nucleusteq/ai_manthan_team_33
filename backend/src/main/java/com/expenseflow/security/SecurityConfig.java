@@ -47,6 +47,9 @@ public class SecurityConfig {
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/signup", "/api/auth/login").permitAll()
                 .requestMatchers("/error").permitAll()
+                // Role check in the filter chain, before body parsing/validation: a non-admin always gets 403,
+                // never a 400 that leaks the request schema (@PreAuthorize on AdminController stays as 2nd layer).
+                .requestMatchers("/api/admin/**").hasRole("SUPER_ADMIN")
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e
                 .authenticationEntryPoint(JsonSecurityErrorHandlers.entryPoint())
