@@ -145,6 +145,12 @@ jobs:
       - name: RBAC API matrix
         run: npx playwright test --project=api
         working-directory: tests/e2e
+      - name: Install browser for UI specs
+        run: npx playwright install --with-deps chromium
+        working-directory: tests/e2e
+      - name: UI specs (desktop + 360px) and axe
+        run: npx playwright test --project=ui --project=ui-mobile
+        working-directory: tests/e2e
       - uses: actions/upload-artifact@v4
         if: always()
         with:
