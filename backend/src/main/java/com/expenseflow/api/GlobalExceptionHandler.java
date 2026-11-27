@@ -12,6 +12,9 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -31,6 +34,34 @@ public class GlobalExceptionHandler {
         ex.getBindingResult().getFieldErrors().forEach(f -> fields.putIfAbsent(f.getField(), f.getDefaultMessage()));
         return ResponseEntity.badRequest()
                 .body(new ApiError("VALIDATION_FAILED", "Request has invalid fields", Map.of("fields", fields)));
+    }
+
+    /** {@code ?page=abc}, {@code ?from=yesterday}: wrong type for a query/path parameter (T-603). */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ApiError> typeMismatch(MethodArgumentTypeMismatchException ex) {
+        String type = ex.getRequiredType() == null ? "value" : ex.getRequiredType().getSimpleName();
+        return ResponseEntity.badRequest().body(new ApiError(ErrorCodes.VALIDATION_FAILED,
+                "Parameter " + ex.getName() + " must be a valid " + type,
+                Map.of("fields", Map.of(ex.getName(), "must be a valid " + type))));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    ResponseEntity<ApiError> missingParam(MissingServletRequestParameterException ex) {
+        return ResponseEntity.badRequest().body(new ApiError(ErrorCodes.VALIDATION_FAILED,
+                "Required parameter " + ex.getParameterName() + " is missing",
+                Map.of("fields", Map.of(ex.getParameterName(), "is required"))));
+    }
+
+    /** Constraint annotations on @RequestParam / @PathVariable (e.g. {@code @Min(0) int page}). */
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    ResponseEntity<ApiError> methodValidation(HandlerMethodValidationException ex) {
+        Map<String, Object> fields = new LinkedHashMap<>();
+        ex.getParameterValidationResults().forEach(r -> {
+            String name = r.getMethodParameter().getParameterName();
+            r.getResolvableErrors().forEach(e -> fields.putIfAbsent(name == null ? "param" : name, e.getDefaultMessage()));
+        });
+        return ResponseEntity.badRequest()
+                .body(new ApiError(ErrorCodes.VALIDATION_FAILED, "Request has invalid parameters", Map.of("fields", fields)));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
