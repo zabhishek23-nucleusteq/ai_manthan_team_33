@@ -1,6 +1,6 @@
 # mock-bank
 
-Mock external bank that receives ExpenseFlow payout files. Synthetic data only. Port `8090`.
+Mock external bank that receives ExpenseFlow payout files. Synthetic data only. Port `8081`.
 
 ## API
 | Method | Path | Notes |
@@ -22,11 +22,11 @@ Apply only to `/bank/**`. `latencyMs` is added to every request; with `mode` `50
 Env defaults: `MOCKBANK_FAULT_MODE`, `MOCKBANK_FAULT_ERROR_RATE`, `MOCKBANK_FAULT_LATENCY_MS`, `MOCKBANK_FAULT_TIMEOUT_MS`.
 
 ```
-curl -X POST localhost:8090/admin/faults -H 'Content-Type: application/json' -d '{"errorRate":1,"latencyMs":0,"mode":"500"}'
-curl -X DELETE localhost:8090/admin/faults
+curl -X POST localhost:8081/admin/faults -H 'Content-Type: application/json' -d '{"errorRate":1,"latencyMs":0,"mode":"500"}'
+curl -X DELETE localhost:8081/admin/faults
 ```
 
 Metrics: `mockbank_payout_files_total{outcome}`, `mockbank_payout_lines_total{outcome}`, `mockbank_faults_injected_total{type}`.
 
 ## Run
-`./mvnw verify` · `docker build -t mock-bank services/mock-bank && docker run -p 8090:8090 mock-bank`
+`./mvnw verify` · `docker build -t mock-bank services/mock-bank && docker run -p 8081:8081 mock-bank`

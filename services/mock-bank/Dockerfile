@@ -12,10 +12,10 @@ WORKDIR /app
 RUN useradd --system --uid 10001 bank
 COPY --from=build /src/target/mock-bank-*.jar app.jar
 USER bank
-ENV PORT=8090 \
+ENV PORT=8081 \
     MOCKBANK_FAULT_MODE=ok \
     MOCKBANK_FAULT_ERROR_RATE=1.0 \
     MOCKBANK_FAULT_LATENCY_MS=0 \
     MOCKBANK_FAULT_TIMEOUT_MS=30000
-EXPOSE 8090
+EXPOSE 8081
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "/app/app.jar"]
