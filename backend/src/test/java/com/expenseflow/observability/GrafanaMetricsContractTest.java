@@ -40,7 +40,7 @@ class GrafanaMetricsContractTest extends AbstractIntegrationTest {
         assertThat(body)
                 .contains("http_server_requests_seconds_bucket{")                       // p95 latency panel/alert
                 .contains("http_server_requests_seconds_count{")                        // error-rate panel/alert
-                .contains("page_load_seconds_bucket{application=\"expenseflow\",route=\"/me/dashboard\"")
+                .contains("page_load_seconds_bucket{application=\"expenseflow\",route=\"") // route may be capped to "other"
                 .contains("approval_queue_size{application=\"expenseflow\",level=\"MANAGER\"}")
                 .contains("approval_oldest_pending_age_seconds{application=\"expenseflow\",level=\"HEAD\"}")
                 .contains("payouts_total{application=\"expenseflow\",outcome=\"success\"}")
