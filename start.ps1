@@ -1,4 +1,5 @@
-$ErrorActionPreference = 'Stop'
+# docker writes progress to stderr; with 'Stop' PowerShell 5.1 treats that as fatal. Exit codes are checked explicitly.
+$ErrorActionPreference = 'Continue'
 Set-Location $PSScriptRoot
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw 'Docker is required' }
 docker info *> $null
