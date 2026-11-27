@@ -33,6 +33,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.expenseflow.domain.ApprovalLevel;
+import com.expenseflow.domain.AuditActions;
 import com.expenseflow.domain.ClaimStatus;
 import com.expenseflow.domain.ExpenseCategory;
 import com.expenseflow.domain.PolicyOutcome;
@@ -440,7 +441,23 @@ public class SeedService {
         for (C c : claims) {
             if (c.code == null) c.code = String.format("EXP-%d-%05d", time(c).atZone(ZoneOffset.UTC).getYear(), ++n);
         }
+        assignSampleAudits();
         buildPayouts();
+    }
+
+    /**
+     * BR-13 / FR-10: exactly every 10th auto-approved claim (chronological, demo claims excluded) is in the sample.
+     * Deterministic so the seed always proves 9-11%. Still-unpaid ones are PENDING (audit queue), paid ones were
+     * audited OK before payout (BR-18: PENDING/EXCEPTION claims are not payable).
+     */
+    private void assignSampleAudits() {
+        int i = 0;
+        for (C c : claims) {
+            if (c.outcome != PolicyOutcome.AUTO_APPROVED || c.code.startsWith("DEMO-")) continue;
+            if (i++ % 10 == 4) {
+                c.sample = c.status == ClaimStatus.APPROVED ? SampleAudit.PENDING : SampleAudit.OK;
+            }
+        }
     }
 
     private static Instant time(C c) {
@@ -619,9 +636,6 @@ public class SeedService {
             l.violations = lr == null || lr.violations().isEmpty() ? null : json.writeValueAsString(lr.violations());
         }
         approvalSteps(c, r);
-        if (r.outcome() == PolicyOutcome.AUTO_APPROVED && rnd.nextInt(10) == 0) {
-            c.sample = c.status == ClaimStatus.APPROVED ? SampleAudit.PENDING : SampleAudit.OK;   // BR-13, BR-18
-        }
         if (c.status == ClaimStatus.AUTO_REJECTED || c.status == ClaimStatus.APPROVED && c.outcome == PolicyOutcome.AUTO_APPROVED
                 || c.status == ClaimStatus.IN_PAYOUT || c.status == ClaimStatus.PAID) {
             if (c.decidedAt == null) c.decidedAt = c.submittedAt.plusSeconds(1);
@@ -963,14 +977,80 @@ public class SeedService {
         jdbc.batchUpdate("insert into claim_comments (claim_id, author_id, body, created_at) values (?, ?, ?, ?)", comments);
 
         // payout batches + items
+        List<Object[]> audit = new ArrayList<>();
         for (Object[] b : batches) {
             @SuppressWarnings("unchecked") List<C> items = (List<C>) b[5];
             BigDecimal total = items.stream().map(C::total).reduce(BigDecimal.ZERO, BigDecimal::add);
+            Instant submitted = (Instant) b[2];
             Long batchId = jdbc.queryForObject("insert into payout_batches (status, created_by_id, item_count, total, value_date, bank_reference, created_at, submitted_at) "
                     + "values (?, ?, ?, ?, ?, ?, ?, ?) returning id", Long.class,
-                    b[0], head.id, items.size(), total, b[1], b[4], ts(((Instant) b[2]).minus(Duration.ofHours(2))), ts((Instant) b[2]));
+                    b[0], head.id, items.size(), total, b[1], b[4], ts(submitted.minus(Duration.ofHours(2))), ts(submitted));
             jdbc.batchUpdate("insert into payout_items (batch_id, claim_id, amount, created_at) values (?, ?, ?, ?)",
-                    items.stream().map(c -> new Object[] {batchId, c.id, c.total(), ts((Instant) b[2])}).toList());
+                    items.stream().map(c -> new Object[] {batchId, c.id, c.total(), ts(submitted)}).toList());
+            audit.add(auditRow(submitted.minus(Duration.ofHours(2)), head.id, null, AuditActions.PAYOUT_CREATED, "PAYOUT_BATCH", batchId,
+                    null, Map.of("status", "CREATED", "items", items.size(), "total", total)));
+            audit.add(auditRow(submitted, head.id, null, AuditActions.PAYOUT_SUBMITTED, "PAYOUT_BATCH", batchId,
+                    Map.of("status", "CREATED"), Map.of("status", "SUBMITTED")));
+        }
+
+        // audit trail consistent with every claim's history (actor NULL = system)
+        for (C c : claims) auditFor(c, audit);
+        jdbc.batchUpdate("insert into audit_events (at, actor_id, on_behalf_of_id, action, entity_type, entity_id, before, after) "
+                + "values (?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb)", audit);
+        auditRows = audit.size();
+    }
+
+    private int auditRows;
+
+    public int auditRows() {
+        return auditRows;
+    }
+
+    private Object[] auditRow(Instant at, Long actor, Long onBehalfOf, String action, String entityType, Object entityId,
+                              Map<String, ?> before, Map<String, ?> after) {
+        return new Object[] {ts(at), actor, onBehalfOf, action, entityType, String.valueOf(entityId),
+                before == null ? null : json.writeValueAsString(before), after == null ? null : json.writeValueAsString(after)};
+    }
+
+    private static final String CLAIM = "CLAIM";
+
+    private void auditFor(C c, List<Object[]> out) {
+        out.add(auditRow(c.createdAt, c.owner.id, null, AuditActions.CLAIM_CREATED, CLAIM, c.id, null, Map.of("status", "DRAFT", "code", c.code)));
+        if (c.submittedAt == null) return;
+        out.add(auditRow(c.submittedAt, c.owner.id, null, AuditActions.CLAIM_SUBMITTED, CLAIM, c.id, Map.of("status", "DRAFT"),
+                Map.of("total", c.total())));
+        Instant engineAt = c.submittedAt.plusMillis(200);
+        switch (c.outcome) {
+            case AUTO_APPROVED -> out.add(auditRow(engineAt, null, null, AuditActions.CLAIM_AUTO_APPROVED, CLAIM, c.id,
+                    Map.of("status", "DRAFT"), Map.of("status", "APPROVED", "policyOutcome", "AUTO_APPROVED")));
+            case AUTO_REJECTED -> out.add(auditRow(engineAt, null, null, AuditActions.CLAIM_AUTO_REJECTED, CLAIM, c.id,
+                    Map.of("status", "DRAFT"), Map.of("status", "AUTO_REJECTED", "policyOutcome", "AUTO_REJECTED")));
+            case ROUTED -> out.add(auditRow(engineAt, null, null, AuditActions.CLAIM_ROUTED, CLAIM, c.id,
+                    Map.of("status", "DRAFT"), Map.of("status", "PENDING_MANAGER", "policyOutcome", "ROUTED")));
+        }
+        for (S s : c.steps) {
+            if (s.decision == null) continue;
+            String action = switch (s.decision) {
+                case "APPROVED" -> AuditActions.CLAIM_APPROVED;
+                case "REJECTED" -> AuditActions.CLAIM_REJECTED;
+                default -> AuditActions.CLAIM_SENT_BACK;
+            };
+            Map<String, Object> after = new LinkedHashMap<>();
+            after.put("level", s.level.name());
+            after.put("decision", s.decision);
+            if (s.comment != null) after.put("comment", s.comment);
+            out.add(auditRow(s.decidedAt, s.actedById, null, action, CLAIM, c.id, Map.of("status", "PENDING_" + s.level.name()), after));
+        }
+        if (c.sample != SampleAudit.NONE) {
+            out.add(auditRow(engineAt.plusMillis(100), null, null, AuditActions.CLAIM_SAMPLE_AUDIT_FLAGGED, CLAIM, c.id,
+                    Map.of("sampleAudit", "NONE"), Map.of("sampleAudit", "PENDING")));
+            if (c.sample == SampleAudit.OK) {
+                out.add(auditRow(c.decidedAt.plus(Duration.ofHours(3)).isAfter(now) ? now.minusSeconds(30) : c.decidedAt.plus(Duration.ofHours(3)),
+                        anita.id, null, AuditActions.CLAIM_SAMPLE_AUDIT_OK, CLAIM, c.id, Map.of("sampleAudit", "PENDING"), Map.of("sampleAudit", "OK")));
+            }
+        }
+        if (c.paidAt != null) {
+            out.add(auditRow(c.paidAt, null, null, AuditActions.CLAIM_PAID, CLAIM, c.id, Map.of("status", "IN_PAYOUT"), Map.of("status", "PAID")));
         }
     }
 

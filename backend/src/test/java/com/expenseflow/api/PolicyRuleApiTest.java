@@ -26,11 +26,25 @@ class PolicyRuleApiTest extends AbstractIntegrationTest {
     @Autowired JwtTokenService tokens;
     @Autowired PolicyRuleRepository rules;
     @Autowired PolicyEventsProbe probe;
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     private final HttpClient http = HttpClient.newHttpClient();
 
+    @Autowired com.expenseflow.repository.UserRepository users;
+
+    private Long actorId;
+
+    /** A real user row: rule changes are audited and audit_events.actor_id references users(id). */
+    private long actor() {
+        if (actorId == null) {
+            String email = "policy-head-" + java.util.UUID.randomUUID() + "@expenseflow.test";
+            actorId = users.save(new com.expenseflow.domain.User("Policy Test Head", email, "x")).getId();
+        }
+        return actorId;
+    }
+
     private String token(String role) {
-        return tokens.issue(990001, role.toLowerCase() + "@expenseflow.test", List.of("EMPLOYEE", role)).value();
+        return tokens.issue(actor(), role.toLowerCase() + "@expenseflow.test", List.of("EMPLOYEE", role)).value();
     }
 
     private HttpResponse<String> get(String token) throws Exception {
@@ -84,8 +98,13 @@ class PolicyRuleApiTest extends AbstractIntegrationTest {
         assertThat(res.body()).contains("\"limitAmount\":1800.5");
         assertThat(rules.findById("CAB_TRIP_LIMIT").orElseThrow().getLimitAmount()).isEqualByComparingTo("1800.50");
 
+        // recorded in the append-only audit trail (L1's AuditService, same transaction)
+        assertThat(jdbc.queryForObject("select count(*) from audit_events where action = 'POLICY_RULE_UPDATED' "
+                + "and entity_type = 'POLICY_RULE' and entity_id = 'CAB_TRIP_LIMIT' and (after->>'limitAmount')::numeric = 1800.50", Long.class))
+                .isEqualTo(1);
+
         PolicyRuleChangedEvent e = probe.events.stream().filter(x -> x.code().equals("CAB_TRIP_LIMIT")).findFirst().orElseThrow();
-        assertThat(e.actorId()).isEqualTo(990001L);
+        assertThat(e.actorId()).isEqualTo(actor());
         assertThat(new BigDecimal(e.before().get("limitAmount").toString())).isEqualByComparingTo("2000");
         assertThat(new BigDecimal(e.after().get("limitAmount").toString())).isEqualByComparingTo("1800.50");
     }

@@ -152,8 +152,29 @@ class SeedTest {
         // approver is never the claimant (BR-15) and auto-rejected claims have a REJECT violation
         assertThat(count("select count(*) from approval_steps s join claims c on c.id = s.claim_id where s.assignee_id = c.employee_id")).isZero();
         assertThat(count("select count(*) from claims c where c.status = 'AUTO_REJECTED' and c.policy_result::text not like '%REJECT%'")).isZero();
-        // sample audit only on auto-approved claims, ~10%
+        // FR-10: sample audit only on auto-approved claims, 9-11% of them; no PENDING sample is in a payout (BR-18)
         assertThat(count("select count(*) from claims where sample_audit <> 'NONE' and policy_outcome <> 'AUTO_APPROVED'")).isZero();
-        assertThat(count("select count(*) from claims where sample_audit <> 'NONE'")).isPositive();
+        double pct = 100.0 * count("select count(*) from claims where sample_audit <> 'NONE'")
+                / count("select count(*) from claims where policy_outcome = 'AUTO_APPROVED'");
+        assertThat(pct).isBetween(9.0, 11.0);
+        assertThat(count("select count(*) from claims where sample_audit = 'PENDING' and status <> 'APPROVED'")).isZero();
+    }
+
+    @Test
+    void auditTrailMatchesClaimHistory() {
+        // every claim created, every submitted claim submitted + decided by the engine
+        assertThat(count("select count(*) from audit_events where action = 'CLAIM_CREATED'")).isEqualTo(3000);
+        assertThat(count("select count(*) from audit_events where action = 'CLAIM_SUBMITTED'"))
+                .isEqualTo(count("select count(*) from claims where submitted_at is not null"));
+        assertThat(count("select count(*) from audit_events where action in ('CLAIM_AUTO_APPROVED','CLAIM_AUTO_REJECTED','CLAIM_ROUTED')"))
+                .isEqualTo(count("select count(*) from claims where submitted_at is not null"));
+        // one audit row per approver decision, by the approver who acted
+        assertThat(count("select count(*) from audit_events where action in ('CLAIM_APPROVED','CLAIM_REJECTED','CLAIM_SENT_BACK')"))
+                .isEqualTo(count("select count(*) from approval_steps where decision is not null"));
+        assertThat(count("select count(*) from audit_events a where a.action = 'CLAIM_APPROVED' and not exists ("
+                + "select 1 from approval_steps s where s.claim_id = a.entity_id::bigint and s.acted_by_id = a.actor_id and s.decision = 'APPROVED')")).isZero();
+        assertThat(count("select count(*) from audit_events where action = 'CLAIM_PAID'")).isEqualTo(statusCount("PAID"));
+        assertThat(count("select count(*) from audit_events where action = 'PAYOUT_CREATED'")).isEqualTo(count("select count(*) from payout_batches"));
+        assertThat(count("select count(*) from audit_events where at > now()")).isZero();
     }
 }
