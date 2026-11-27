@@ -9,7 +9,9 @@ export type ThemeMode = 'light' | 'dark'
 export const brandTokens = {
   colorPrimary: '#0958d9',
   colorSuccess: '#389e0d',
-  colorWarning: '#d48806',
+  // Ant gold-9: ~6.8:1 on white and ~5.5:1 on antd 6's filled warning tag background rgb(237,232,213).
+  // gold-6 #d48806 (~2.9:1) and gold-8 #ad6800 (~3.6:1 on the tag) failed axe color-contrast (T-506).
+  colorWarning: '#874d00',
   colorError: '#cf1322',
   colorInfo: '#0958d9',
   borderRadius: 8,
@@ -23,8 +25,11 @@ export function getThemeConfig(mode: ThemeMode): ThemeConfig {
     algorithm: mode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
     token: {
       ...brandTokens,
-      // Dark mode: a lighter primary keeps AA contrast on the dark background.
-      ...(mode === 'dark' ? { colorPrimary: '#4096ff', colorInfo: '#4096ff' } : {}),
+      // Secondary/description text (Typography type="secondary", Result subtitles, form help) at >= 4.5:1;
+      // Ant's default 45% alpha is ~3.4:1 on white (T-506).
+      colorTextDescription: mode === 'dark' ? 'rgba(255, 255, 255, 0.68)' : 'rgba(0, 0, 0, 0.65)',
+      // Dark mode: lighter primary/warning keep AA contrast on the dark background.
+      ...(mode === 'dark' ? { colorPrimary: '#4096ff', colorInfo: '#4096ff', colorWarning: '#d89614' } : {}),
     },
     components: {
       Layout: mode === 'dark' ? {} : { headerBg: '#ffffff', bodyBg: '#f5f7fa' },
