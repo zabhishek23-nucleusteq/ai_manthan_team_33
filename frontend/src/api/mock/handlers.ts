@@ -1,4 +1,4 @@
-import type { Claim, ClaimInput } from '../types'
+import type { ApprovalLevel, Claim, ClaimInput, Violation } from '../types'
 import { buildClaims, DEPARTMENTS, toSummary } from './fixtures'
 import { err, mockRoute, type MockResponse } from './router'
 
@@ -43,7 +43,66 @@ function applyInput(c: Claim, input: ClaimInput): void {
   c.total = Math.round(c.lines.reduce((s, l) => s + l.amount, 0) * 100) / 100
 }
 
+const TIER1 = ['mumbai', 'delhi', 'bengaluru', 'chennai', 'kolkata', 'hyderabad', 'pune', 'ahmedabad']
+
+/**
+ * Simplified per-line policy (BR-4..9 shapes) so the UI shows realistic results in mock mode.
+ * The backend policy engine (T-015) is the real authority.
+ */
+function applyMockPolicy(c: Claim): void {
+  const lineResults = c.lines.map((l) => {
+    const vs: Violation[] = []
+    if (l.amount > 500 && !l.receiptId)
+      vs.push({ code: 'RECEIPT_REQUIRED', action: 'REJECT', message: `Receipt required above 500 INR (amount ${l.amount})` })
+    if (l.category === 'MEAL' && l.amount > 1500)
+      vs.push({ code: 'MEAL_DAILY_LIMIT', action: 'ROUTE', message: `Meals ${l.amount} INR above 1,500 INR daily limit` })
+    if (l.category === 'CAB' && l.amount > 2000)
+      vs.push({ code: 'CAB_TRIP_LIMIT', action: 'ROUTE', message: `Cab ${l.amount} INR above 2,000 INR per trip` })
+    if (l.category === 'HOTEL' && l.nights) {
+      const limit = TIER1.includes((l.city ?? '').trim().toLowerCase()) ? 6000 : 4000
+      const perNight = l.amount / l.nights
+      if (perNight > limit)
+        vs.push({ code: 'HOTEL_NIGHTLY_LIMIT', action: 'ROUTE', message: `Hotel ${Math.round(perNight)} INR per night above ${limit} INR limit` })
+    }
+    const day = new Date(`${l.expenseDate}T00:00:00Z`).getUTCDay()
+    if (day === 0 || day === 6) vs.push({ code: 'WEEKEND_SPEND', action: 'ROUTE', message: 'Expense on a weekend' })
+    l.violations = vs
+    return { lineId: l.id, violations: vs }
+  })
+  const all = lineResults.flatMap((r) => r.violations)
+  const outcome = all.some((v) => v.action === 'REJECT')
+    ? 'AUTO_REJECTED'
+    : all.length || c.total > 5000
+      ? 'ROUTED'
+      : 'AUTO_APPROVED'
+  const requiredLevels: ApprovalLevel[] =
+    outcome === 'ROUTED' ? ['MANAGER', ...(c.total > 25000 ? ['AUDITOR' as const] : []), ...(c.total > 100000 ? ['HEAD' as const] : [])] : []
+  c.policyResult = { outcome, reasons: [...new Set(all.map((v) => v.code))], lineResults, requiredLevels }
+  c.status = outcome === 'AUTO_REJECTED' ? 'AUTO_REJECTED' : outcome === 'AUTO_APPROVED' ? 'APPROVED' : 'PENDING_MANAGER'
+  c.steps = outcome === 'ROUTED' ? [{ level: 'MANAGER', decision: 'PENDING', createdAt: new Date().toISOString() }] : []
+}
+
+let nextReceiptId = 500
+
 export function registerDefaultMocks(): void {
+  mockRoute('POST', '/api/receipts', ({ body }) => {
+    const file = body instanceof FormData ? body.get('file') : null
+    if (!(file instanceof Blob)) return err(400, 'VALIDATION_FAILED', 'file is required')
+    if (!['image/jpeg', 'image/png', 'application/pdf'].includes(file.type))
+      return err(415, 'UNSUPPORTED_FILE_TYPE', 'Only PDF, JPG or PNG receipts are accepted')
+    if (file.size > 5 * 1024 * 1024) return err(413, 'RECEIPT_TOO_LARGE', 'Receipt is larger than 5 MB')
+    return {
+      status: 201,
+      body: {
+        id: nextReceiptId++,
+        fileName: (file as File).name ?? 'receipt',
+        contentType: file.type,
+        size: file.size,
+        sha256: `mock-${nextReceiptId}-${file.size}`,
+      },
+    }
+  })
+
   mockRoute('GET', '/api/departments', () => ({ status: 200, body: DEPARTMENTS }))
 
   mockRoute('GET', '/api/claims', ({ userId, query }) => {
@@ -122,9 +181,7 @@ export function registerDefaultMocks(): void {
     if (!EDITABLE.has(c.status))
       return err(409, 'ILLEGAL_STATE_TRANSITION', `Claim ${c.code} is ${c.status}; cannot submit`, { from: c.status, action: 'submit' })
     if (c.lines.length === 0) return err(422, 'CLAIM_EMPTY', 'Add at least one expense line before submitting')
-    // Simplified policy for the mock: real rules (BR-1..12) live in the backend.
-    const needsReceipt = c.lines.some((l) => l.amount > 500 && !l.receiptId)
-    c.status = needsReceipt ? 'AUTO_REJECTED' : c.total <= 5000 ? 'APPROVED' : 'PENDING_MANAGER'
+    applyMockPolicy(c)
     c.submittedAt = new Date().toISOString()
     c.version = (c.version ?? 1) + 1
     const response: MockResponse = { status: 200, body: structuredClone(c) }
