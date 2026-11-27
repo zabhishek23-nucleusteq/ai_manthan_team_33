@@ -1,4 +1,4 @@
-import { Card, Typography, theme } from 'antd'
+import { Card, Statistic, Typography, theme } from 'antd'
 import { useState, type ReactNode } from 'react'
 
 /**
@@ -76,9 +76,12 @@ export function KpiFlashcard({
             </span>
             <Typography.Text type="secondary">{title}</Typography.Text>
           </div>
-          <div style={{ fontSize: 26, fontWeight: 600, marginTop: 10, fontVariantNumeric: 'tabular-nums', color: token.colorText }}>
-            {value}
-          </div>
+          {/* Ant Statistic keeps the .ant-statistic-content hook used by the E2E specs (TC-14). */}
+          <Statistic
+            value={value as string | number}
+            style={{ marginTop: 6 }}
+            styles={{ content: { fontSize: 26, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: token.colorText } }}
+          />
         </Card>
         <Card
           size="small"
