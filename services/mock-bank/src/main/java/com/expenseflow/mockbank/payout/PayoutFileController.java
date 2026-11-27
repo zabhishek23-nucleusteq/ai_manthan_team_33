@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -41,6 +42,14 @@ public class PayoutFileController {
             @RequestPart("file") MultipartFile file,
             @RequestHeader(name = IDEMPOTENCY_KEY, required = false) String key) throws IOException {
         return respond(service.submit(new String(file.getBytes(), StandardCharsets.UTF_8), key));
+    }
+
+    /** Reconcile by batch: {@code GET /bank/payout-files?batchId=PB-7}. */
+    @GetMapping(params = "batchId")
+    public ResponseEntity<PayoutFileResult> getByBatch(@RequestParam String batchId) {
+        return service.findByBatch(batchId)
+                .map(ResponseEntity::ok)
+                .orElseThrow(() -> new PayoutFileNotFoundException("batch " + batchId));
     }
 
     @GetMapping("/{fileId}")

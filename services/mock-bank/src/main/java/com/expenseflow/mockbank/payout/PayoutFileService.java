@@ -14,9 +14,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Service;
 
 /**
- * In-memory store of received payout files. Idempotent per {@code Idempotency-Key}: the same key with the
- * same content returns the original result (never a second payout); the same key with other content is a
- * conflict.
+ * In-memory store of received payout files. Idempotent on the file's BATCH_ID (the business identity): the same
+ * batch with the same content returns the original result (never a second payout); the same batch with other
+ * content is a conflict. An optional {@code Idempotency-Key} header is bound to the first batch it was used with.
  */
 @Service
 public class PayoutFileService {
@@ -29,7 +29,8 @@ public class PayoutFileService {
     }
 
     private final Map<String, PayoutFileResult> files = new ConcurrentHashMap<>();
-    private final Map<String, Stored> byKey = new ConcurrentHashMap<>();
+    private final Map<String, Stored> byBatch = new ConcurrentHashMap<>();
+    private final Map<String, String> batchByKey = new ConcurrentHashMap<>();
     private final MeterRegistry meters;
     private final Clock clock = Clock.systemUTC();
 
@@ -38,18 +39,27 @@ public class PayoutFileService {
     }
 
     public Submission submit(String content, String idempotencyKey) {
-        if (idempotencyKey == null || idempotencyKey.isBlank()) {
-            return new Submission(process(content), false);
+        PayoutCsvParser.Result parsed;
+        try {
+            parsed = PayoutCsvParser.parse(content);
+        } catch (InvalidPayoutFileException e) {
+            meters.counter("mockbank_payout_files_total", "outcome", "invalid").increment();
+            throw e;
         }
-        String hash = sha256(content == null ? "" : content);
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            String boundBatch = batchByKey.putIfAbsent(idempotencyKey, parsed.batchId());
+            if (boundBatch != null && !boundBatch.equals(parsed.batchId())) {
+                conflict("Idempotency-Key already used for batch " + boundBatch);
+            }
+        }
+        String hash = sha256(content);
         boolean[] created = {false};
-        Stored stored = byKey.computeIfAbsent(idempotencyKey, k -> {
+        Stored stored = byBatch.computeIfAbsent(parsed.batchId(), b -> {
             created[0] = true;
-            return new Stored(hash, process(content));
+            return new Stored(hash, store(parsed));
         });
         if (!stored.contentHash().equals(hash)) {
-            meters.counter("mockbank_payout_files_total", "outcome", "idempotency_conflict").increment();
-            throw new IdempotencyConflictException("Idempotency-Key already used with a different file");
+            conflict("BATCH_ID " + parsed.batchId() + " was already submitted with different content");
         }
         if (!created[0]) {
             meters.counter("mockbank_payout_files_total", "outcome", "replayed").increment();
@@ -61,21 +71,26 @@ public class PayoutFileService {
         return Optional.ofNullable(files.get(fileId));
     }
 
-    private PayoutFileResult process(String content) {
-        PayoutCsvParser.Result parsed;
-        try {
-            parsed = PayoutCsvParser.parse(content);
-        } catch (InvalidPayoutFileException e) {
-            meters.counter("mockbank_payout_files_total", "outcome", "invalid").increment();
-            throw e;
-        }
+    /** Reconciliation: what happened to a batch whose submit outcome is unknown (e.g. after a timeout)? */
+    public Optional<PayoutFileResult> findByBatch(String batchId) {
+        return Optional.ofNullable(byBatch.get(batchId)).map(Stored::result);
+    }
+
+    private void conflict(String message) {
+        meters.counter("mockbank_payout_files_total", "outcome", "idempotency_conflict").increment();
+        throw new IdempotencyConflictException(message);
+    }
+
+    private PayoutFileResult store(PayoutCsvParser.Result parsed) {
         int rejected = parsed.errors().size();
         String status = parsed.accepted() == 0 ? "REJECTED" : rejected == 0 ? "ACCEPTED" : "PARTIALLY_ACCEPTED";
         PayoutFileResult result = new PayoutFileResult(
                 "PF-" + UUID.randomUUID(),
+                parsed.batchId(),
+                parsed.valueDate(),
                 parsed.accepted(),
                 rejected,
-                parsed.acceptedAmountMinor(),
+                parsed.acceptedAmount(),
                 status,
                 parsed.errors(),
                 Instant.now(clock));

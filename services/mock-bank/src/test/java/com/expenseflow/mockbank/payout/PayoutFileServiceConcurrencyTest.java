@@ -13,8 +13,10 @@ import org.junit.jupiter.api.Test;
 
 class PayoutFileServiceConcurrencyTest {
 
-    static final String CSV = "reference,employee_id,payee_name,account_number,ifsc,amount_minor,currency\n"
-            + "R1,E1,N,123456,HDFC0001234,500,INR\n";
+    static final String CSV =
+            "RECORD_TYPE,BATCH_ID,VALUE_DATE,EMPLOYEE_CODE,BENEFICIARY_NAME,ACCOUNT_NO,IFSC,AMOUNT,CURRENCY,NARRATION\n"
+            + "D,PB-1,2026-11-27,EMP0001,N,123456,HDFC0001234,500.00,INR,DEMO-1\n"
+            + "T,PB-1,2026-11-27,1,500.00\n";
 
     @Test
     void parallelSubmitsWithSameKey_produceExactlyOneFile() throws Exception {

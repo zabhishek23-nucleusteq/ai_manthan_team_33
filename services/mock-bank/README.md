@@ -5,16 +5,21 @@ Mock external bank that receives ExpenseFlow payout files. Synthetic data only. 
 ## API
 | Method | Path | Notes |
 |---|---|---|
-| POST | `/bank/payout-files` | Body `text/csv` (or multipart field `file`). Optional `Idempotency-Key` header: same key + same file -> original result (200, `Idempotent-Replayed: true`); same key + other file -> 422. New file -> 201 `{fileId, accepted, rejected, acceptedAmountMinor, status, errors[], receivedAt}`. Bad header / no rows -> 400. |
-| GET | `/bank/payout-files/{fileId}` | Look up / reconcile a file. 404 if unknown. |
+| POST | `/bank/payout-files` | Body `text/csv` (or multipart field `file`) in BR-17 format. New batch -> 201 `{fileId, batchId, valueDate, accepted, rejected, acceptedAmount, status, errors[{line, reference, reason}], receivedAt}`. Idempotent on `BATCH_ID`: same batch + same file -> original result (200, `Idempotent-Replayed: true`, never paid twice); same batch + other content -> 422 `IDEMPOTENCY_KEY_REUSED`. Optional `Idempotency-Key` header is bound to the first batch it was sent with (other batch -> 422). File-level problems -> 400 `INVALID_FILE`. |
+| GET | `/bank/payout-files?batchId=PB-7` | Reconcile a batch whose submit outcome is unknown (e.g. after a timeout). 404 if the bank never got it. |
+| GET | `/bank/payout-files/{fileId}` | Look up a file. 404 if unknown. |
 | GET/POST/DELETE | `/admin/faults` | Read / set / reset faults. `{"errorRate":0.5,"latencyMs":3000,"mode":"ok\|500\|timeout"}` |
 | GET | `/actuator/health`, `/actuator/prometheus` | Never affected by faults. |
 
-CSV format (`amount_minor` in paise, per-line max 100000000):
+File format = BR-17 (docs/requirements.md): UTF-8 CSV, header, one `D` row per claim, `T` trailer last.
 ```
-reference,employee_id,payee_name,account_number,ifsc,amount_minor,currency
-CLM-1001,EMP-001,Asha Rao,123456789012,HDFC0001234,125050,INR
+RECORD_TYPE,BATCH_ID,VALUE_DATE,EMPLOYEE_CODE,BENEFICIARY_NAME,ACCOUNT_NO,IFSC,AMOUNT,CURRENCY,NARRATION
+D,PB-7,2026-11-27,EMP0001,Asha Rao,123456789012,HDFC0001234,1250.50,INR,DEMO-1001
+T,PB-7,2026-11-27,1,1250.50
 ```
+- **400 (whole file):** wrong header, no `D` rows, missing/misplaced trailer, unknown RECORD_TYPE, mixed BATCH_ID/VALUE_DATE, VALUE_DATE not `yyyy-MM-dd`, trailer batch/date/count/total mismatch (total = sum of all `D` amounts).
+- **Row rejected (rest accepted):** wrong column count, empty/duplicate NARRATION, empty EMPLOYEE_CODE/BENEFICIARY_NAME, ACCOUNT_NO not 6-18 digits, bad IFSC, AMOUNT not exactly 2 decimals, <= 0 or > 1000000.00, CURRENCY not `INR`.
+
 Status: `ACCEPTED` / `PARTIALLY_ACCEPTED` / `REJECTED` (all rows bad).
 
 ## Faults
