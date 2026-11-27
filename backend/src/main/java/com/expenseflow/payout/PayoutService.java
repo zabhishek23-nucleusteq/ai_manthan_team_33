@@ -59,14 +59,19 @@ public class PayoutService {
     private final TransactionTemplate tx;
     private final TransactionTemplate readTx;
 
+    /** L3's SRE metrics: external_call_seconds{target=bank,outcome} + payouts_total{outcome} (Grafana panels, alerts). */
+    private final com.expenseflow.observability.BankCallMetrics bankMetrics;
+
     public PayoutService(PayoutBatchRepository batches, ClaimRepository claims, UserRepository users, MockBankClient bank,
-                         ApplicationEventPublisher events, MeterRegistry meters, PlatformTransactionManager txm) {
+                         ApplicationEventPublisher events, MeterRegistry meters, PlatformTransactionManager txm,
+                         com.expenseflow.observability.BankCallMetrics bankMetrics) {
         this.batches = batches;
         this.claims = claims;
         this.users = users;
         this.bank = bank;
         this.events = events;
         this.meters = meters;
+        this.bankMetrics = bankMetrics;
         this.tx = new TransactionTemplate(txm);
         this.readTx = new TransactionTemplate(txm);
         this.readTx.setReadOnly(true);
@@ -167,9 +172,13 @@ public class PayoutService {
 
         // (2) bank call outside any transaction; same key for every attempt of this batch -> bank pays once
         BankResult result;
+        long started = System.nanoTime();
         try {
             result = bank.submit(csv, "payout-batch-" + batchId);
+            // a 200 with every row rejected is a failed payout even though the call itself succeeded
+            bankMetrics.record(java.time.Duration.ofNanos(System.nanoTime() - started), !"REJECTED".equals(result.status()));
         } catch (BankException e) {
+            bankMetrics.record(java.time.Duration.ofNanos(System.nanoTime() - started), false);
             meters.counter("expenseflow_bank_submit_total", "result", e.kind()).increment();
             tx.executeWithoutResult(s -> {
                 PayoutBatch b = batches.findByIdForUpdate(batchId).orElseThrow(PayoutService::notFound);
