@@ -15,6 +15,7 @@ Every bug found by tests, gates, SRE or review. Flow: `docs/sre/sre-handbook.md`
 | T-508 | SEV3 | security probe | Frontend nginx sends no security headers (CSP, X-Frame-Options, nosniff) | L2 | merged | Closed - verified: CSP, X-Frame-Options DENY, nosniff, Referrer-Policy on :3000 |
 | T-509 | SEV3 | team | 403 page right after login when switching demo users (stale ?next= from previous role) | L2 | merged | Closed |
 | T-510 | SEV3 | CI | SeedTest flaky: DUPLICATE_LINE 59 < 60 | L3 | merged | Closed |
+| T-511 | SEV3 | demo rehearsal (L4) | `BankPayoutFailures` alert did not fire on the first payout failure after a backend start | L2 | none needed: `payouts_total{outcome="failure"}` is already registered at 0 when the backend starts (checked by L5; `GrafanaMetricsContractTest` covers it); not reproduced | Closed - known issue; the workaround is in `docs/demo-script.md` |
 
 Process notes
 - The "known bug" mechanism (`test.fail` with the bug id) keeps CI usable while a bug is open and turns CI red the moment the bug is fixed, so the marker is removed in the same PR as the fix.
