@@ -4,14 +4,18 @@ import { useState } from 'react'
 import type { AuditEvent } from '../../api/types'
 import { PageEmpty, PageError, PageLoading } from '../../components/PageState'
 import { AdminShell } from './AdminShell'
-import { errorText } from './adminModel'
+import { errorText, rangeFor } from './adminModel'
 import { type AuditFilter, useAdminAudit } from './adminApi'
+import { DateRangeFilter } from './DateRangeFilter'
 
 const ENTITY_TYPES = ['CLAIM', 'POLICY_RULE', 'DELEGATION', 'PAYOUT_BATCH', 'USER']
 
-/** /admin/audit (FR-15): append-only audit trail, filterable by action and entity type. */
+/**
+ * /admin/audit (FR-15): append-only audit trail, filterable by date range, action and entity type.
+ * The API requires from/to (contract From/To, NFR-DASH), so the page always sends a range: last 7 days by default.
+ */
 export function AdminAuditPage() {
-  const [filter, setFilter] = useState<AuditFilter>({})
+  const [filter, setFilter] = useState<AuditFilter>(() => rangeFor('7D'))
   const [page, setPage] = useState(0)
   const audit = useAdminAudit(filter, page)
   const update = (f: Partial<AuditFilter>) => {
@@ -21,6 +25,10 @@ export function AdminAuditPage() {
 
   const filters = (
     <Space wrap>
+      <DateRangeFilter
+        value={{ from: filter.from ?? '', to: filter.to ?? '' }}
+        onChange={(r) => update({ from: r.from, to: r.to })}
+      />
       <Input.Search
         aria-label="Filter by action"
         placeholder="Action, e.g. CLAIM_APPROVED"

@@ -14,6 +14,7 @@ import {
   SunOutlined,
   SwapOutlined,
   TeamOutlined,
+  WalletOutlined,
 } from '@ant-design/icons'
 import { Button, Drawer, Grid, Layout, Menu, Tag, Tooltip, Typography, theme, type MenuProps } from 'antd'
 import { useMemo, useState, type ReactNode } from 'react'
@@ -68,9 +69,11 @@ export function AppLayout() {
   const sortedRoles = ROLE_PRIORITY.filter((r) => roles.includes(r))
   const mainRole = primaryRole(roles)
 
+  // Desktop side nav is brand blue (dark menu tokens in design/theme.ts); the mobile drawer stays light.
   const menu = (
     <Menu
       mode="inline"
+      theme={isDesktop ? 'dark' : 'light'}
       aria-label="Main menu"
       items={toMenuItems(nav)}
       selectedKeys={selected ? [selected] : []}
@@ -125,9 +128,26 @@ export function AppLayout() {
             onClick={() => setDrawerOpen(true)}
           />
         )}
-        <Typography.Text strong style={{ fontSize: isDesktop ? 18 : 16, whiteSpace: 'nowrap', flexShrink: 0 }}>
-          ExpenseFlow
-        </Typography.Text>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <span
+            aria-hidden
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              color: '#ffffff',
+              background: 'linear-gradient(160deg, #1f5fbf 0%, #143f80 100%)',
+            }}
+          >
+            <WalletOutlined />
+          </span>
+          <Typography.Text strong style={{ fontSize: isDesktop ? 18 : 16, whiteSpace: 'nowrap', color: token.colorPrimary }}>
+            ExpenseFlow
+          </Typography.Text>
+        </span>
         {/* Takes the free space and truncates, so the header never overflows at 360px. */}
         <div
           style={{ flex: '1 1 auto', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}
@@ -154,7 +174,7 @@ export function AppLayout() {
       </Layout.Header>
       <Layout>
         {isDesktop ? (
-          <Layout.Sider width={232} theme={mode === 'dark' ? 'dark' : 'light'} style={{ paddingTop: 8 }}>
+          <Layout.Sider width={232} theme="dark" style={{ paddingTop: 8 }}>
             {menu}
           </Layout.Sider>
         ) : (

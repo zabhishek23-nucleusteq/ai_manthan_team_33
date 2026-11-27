@@ -22,6 +22,9 @@ export const brandTokens = {
   fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif',
 } as const
 
+/** Dark end of the login brand gradient; white text on it is ~10:1. */
+export const SIDER_BG = '#143f80'
+
 export function getThemeConfig(mode: ThemeMode): ThemeConfig {
   return {
     algorithm: mode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
@@ -36,7 +39,22 @@ export function getThemeConfig(mode: ThemeMode): ThemeConfig {
         : {}),
     },
     components: {
-      Layout: mode === 'dark' ? {} : { headerBg: '#ffffff', bodyBg: '#f5f7fa' },
+      // Light mode: brand-blue side navigation (same #143f80/#1f5fbf as the login brand panel) so the app
+      // carries the brand colour, not just white/grey. Text alphas keep >= 4.5:1 on #143f80.
+      Layout: mode === 'dark' ? {} : { headerBg: '#ffffff', bodyBg: '#f5f7fa', siderBg: SIDER_BG },
+      Menu:
+        mode === 'dark'
+          ? {}
+          : {
+              darkItemBg: SIDER_BG,
+              darkSubMenuItemBg: SIDER_BG,
+              darkItemColor: 'rgba(255, 255, 255, 0.85)',
+              darkItemHoverColor: '#ffffff',
+              darkItemHoverBg: 'rgba(255, 255, 255, 0.08)',
+              darkItemSelectedBg: brandTokens.colorPrimary,
+              darkItemSelectedColor: '#ffffff',
+              darkGroupTitleColor: 'rgba(255, 255, 255, 0.75)',
+            },
     },
   }
 }
