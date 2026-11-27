@@ -3,6 +3,10 @@ import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router-dom'
 import { QueryProvider } from './api/QueryProvider'
 import { DesignPage } from './design/DesignPage'
 import { ThemeProvider } from './design/ThemeProvider'
+import { AdminAuditPage } from './features/admin/AdminAuditPage'
+import { AdminHealthPage } from './features/admin/AdminHealthPage'
+import { AdminOverviewPage } from './features/admin/AdminOverviewPage'
+import { AdminUsersPage } from './features/admin/AdminUsersPage'
 import { AuthProvider } from './features/auth/AuthProvider'
 import { useAuth } from './features/auth/authContext'
 import { ForbiddenPage } from './features/auth/ForbiddenPage'
@@ -70,11 +74,36 @@ export function AppRoutes() {
           </RequireRole>
         }
       />
+      {/* Super admin (T-034). */}
       <Route
         path="/admin"
         element={
           <RequireRole roles={['SUPER_ADMIN']}>
-            <LandingPlaceholder title="Admin overview" />
+            <AdminOverviewPage />
+          </RequireRole>
+        }
+      />
+      <Route
+        path="/admin/users"
+        element={
+          <RequireRole roles={['SUPER_ADMIN']}>
+            <AdminUsersPage />
+          </RequireRole>
+        }
+      />
+      <Route
+        path="/admin/audit"
+        element={
+          <RequireRole roles={['SUPER_ADMIN']}>
+            <AdminAuditPage />
+          </RequireRole>
+        }
+      />
+      <Route
+        path="/admin/health"
+        element={
+          <RequireRole roles={['SUPER_ADMIN']}>
+            <AdminHealthPage />
           </RequireRole>
         }
       />

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppRoutes } from '../../App'
+import { QueryProvider } from '../../api/QueryProvider'
 import { ThemeProvider } from '../../design/ThemeProvider'
 import { AuthProvider } from './AuthProvider'
 import { canOpen, landingRouteFor, postLoginTarget, safeNext } from './roles'
@@ -16,14 +17,16 @@ function LocationProbe() {
 
 function renderApp(path: string) {
   return render(
-    <ThemeProvider initialMode="light">
-      <AuthProvider>
-        <MemoryRouter initialEntries={[path]}>
-          <AppRoutes />
-          <LocationProbe />
-        </MemoryRouter>
-      </AuthProvider>
-    </ThemeProvider>,
+    <QueryProvider>
+      <ThemeProvider initialMode="light">
+        <AuthProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <AppRoutes />
+            <LocationProbe />
+          </MemoryRouter>
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryProvider>,
   )
 }
 
