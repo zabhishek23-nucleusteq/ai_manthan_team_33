@@ -134,6 +134,18 @@ class ClaimApiTest extends AbstractIntegrationTest {
         assertThat(send("GET", "/api/departments", null, null).statusCode()).isEqualTo(401);
     }
 
+    /** Found by L6's RBAC matrix in CI: a role without access must get 403 even with an invalid body / missing key / no file. */
+    @Test
+    void roleWithoutAccess_403_beforeValidationOrIdempotency() throws Exception {
+        String admin = user("SUPER_ADMIN").token();
+        assertThat(send("POST", "/api/claims", admin, "{}").statusCode()).isEqualTo(403);
+        assertThat(send("PUT", "/api/claims/1", admin, "{}").statusCode()).isEqualTo(403);
+        assertThat(send("POST", "/api/claims/1/submit", admin, "{}").statusCode()).as("no Idempotency-Key").isEqualTo(403);
+        assertThat(send("POST", "/api/claims/1/comments", admin, "{}").statusCode()).isEqualTo(403);
+        assertThat(send("POST", "/api/receipts", admin, null).statusCode()).as("no file").isEqualTo(403);
+        assertThat(send("GET", "/api/receipts/1/content", admin, null).statusCode()).isEqualTo(403);
+    }
+
     @Test
     void createDraft_201() throws Exception {
         Who w = employee();
