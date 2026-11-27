@@ -22,7 +22,9 @@ import { isApiError } from '../../api/errors'
 import { useIdempotencyKey } from '../../api/idempotency'
 import type { Category, Claim } from '../../api/types'
 import { PageError, PageLoading } from '../../components/PageState'
-import { useClaim, useSaveClaim, useSubmitClaim } from './claimsApi'
+import { clarificationQuestion } from './claimDetailModel'
+import { useClaim, useClaimComments, useSaveClaim, useSubmitClaim } from './claimsApi'
+import { ClarificationBanner } from './ClarificationBanner'
 import { CustomerPage } from './CustomerPage'
 import { claimToForm, emptyLine, formToInput, MAX_LINES, type EditorForm, type LineForm } from './editorModel'
 import { CATEGORY_LABEL, CATEGORY_OPTIONS, EDITABLE_STATUSES, inr } from './format'
@@ -371,6 +373,8 @@ export function ClaimEditorPage() {
   const claimId = id ? Number(id) : undefined
   const { data: claim, isPending, isError, error, refetch } = useClaim(claimId)
   const copyFrom = (location.state as { copyFrom?: Claim } | null)?.copyFrom
+  const comments = useClaimComments(claimId, claim?.status === 'CLARIFICATION_REQUESTED')
+  const question = claim ? clarificationQuestion(claim, comments.data) : null
 
   const initialNew = useMemo<EditorForm>(
     () =>
@@ -426,6 +430,7 @@ export function ClaimEditorPage() {
   }
   return (
     <CustomerPage title={`Edit ${claim.code}`} back={back}>
+      {question ? <ClarificationBanner question={question} /> : null}
       <ClaimEditor key={claim.id} claim={claim} initial={claimToForm(claim)} />
     </CustomerPage>
   )

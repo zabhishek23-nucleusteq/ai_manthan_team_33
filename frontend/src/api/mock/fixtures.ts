@@ -1,4 +1,15 @@
-import type { Claim, ClaimLine, ClaimStatus, ClaimSummary, Department, UserRef, Violation } from '../types'
+import type {
+  ApprovalStep,
+  AuditEvent,
+  Claim,
+  ClaimLine,
+  ClaimStatus,
+  ClaimSummary,
+  Comment,
+  Department,
+  UserRef,
+  Violation,
+} from '../types'
 
 /** Synthetic fixtures only (demo users from rbac.md §4). Dates are relative to "now". */
 export const DEPARTMENTS: Department[] = [
@@ -168,6 +179,56 @@ const seeds: Seed[] = [
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 
+const FARHAN: UserRef = { id: 4, name: 'Farhan Head', email: 'head@expenseflow.test' }
+const MEERA: UserRef = { id: 6, name: 'Meera Backup', email: 'manager2@expenseflow.test' }
+
+export const CLARIFICATION_QUESTION = 'Please attach the hotel bill for line 1 and confirm the number of nights.'
+
+/** Approval steps that match each status (ADR-001 chain: MANAGER -> AUDITOR > 25,000 -> HEAD > 1,00,000). */
+function stepsFor(status: ClaimStatus, ageDays: number, total: number): ApprovalStep[] {
+  const at = (d: number) => daysAgoIso(Math.max(0, ageDays - d), 14)
+  const done = (level: ApprovalStep['level'], who: UserRef, d: number, extra: Partial<ApprovalStep> = {}): ApprovalStep => ({
+    level,
+    assignee: who,
+    actedBy: who,
+    decision: 'APPROVED',
+    createdAt: at(d - 1),
+    decidedAt: at(d),
+    ...extra,
+  })
+  const pending = (level: ApprovalStep['level'], who: UserRef, d: number): ApprovalStep => ({
+    level,
+    assignee: who,
+    decision: 'PENDING',
+    createdAt: at(d),
+  })
+  switch (status) {
+    case 'PENDING_MANAGER':
+      return [pending('MANAGER', RAHUL, 0)]
+    case 'PENDING_AUDITOR':
+      return [done('MANAGER', RAHUL, 1), pending('AUDITOR', ANITA, 1)]
+    case 'PENDING_HEAD':
+      // Rahul was on leave: Meera approved on his behalf (delegation).
+      return [
+        done('MANAGER', RAHUL, 1, { actedBy: MEERA, onBehalfOf: RAHUL, comment: 'Approved while Rahul is on leave' }),
+        done('AUDITOR', ANITA, 2),
+        pending('HEAD', FARHAN, 2),
+      ]
+    case 'CLARIFICATION_REQUESTED':
+      return [done('MANAGER', RAHUL, 1, { decision: 'SENT_BACK', comment: CLARIFICATION_QUESTION })]
+    case 'REJECTED':
+      return [done('MANAGER', RAHUL, 2, { decision: 'REJECTED', comment: 'Client dinner was not pre-approved.' })]
+    case 'APPROVED':
+    case 'IN_PAYOUT':
+    case 'PAID':
+      return total > 5000
+        ? [done('MANAGER', RAHUL, 1), ...(total > 25000 ? [done('AUDITOR', ANITA, 2)] : [])]
+        : []
+    default:
+      return []
+  }
+}
+
 export function buildClaims(): Claim[] {
   lineId = 1
   return seeds.map((s, i) => {
@@ -183,13 +244,54 @@ export function buildClaims(): Claim[] {
       employee: PRIYA,
       department: DEPARTMENTS[0],
       lines,
-      steps: submitted && s.status !== 'AUTO_REJECTED' ? [{ level: 'MANAGER', assignee: RAHUL, decision: 'PENDING' }] : [],
+      steps: stepsFor(s.status, s.ageDays, total),
       sampleAudit: 'NONE',
       createdAt: daysAgoIso(s.ageDays + 1),
       submittedAt: submitted ? daysAgoIso(s.ageDays) : undefined,
       version: 1,
     }
   })
+}
+
+/** Seed comments: the manager's clarification question on DEMO-1004. */
+export function buildComments(claims: Claim[]): Map<number, Comment[]> {
+  const m = new Map<number, Comment[]>()
+  const c1004 = claims.find((c) => c.code === 'DEMO-1004')
+  if (c1004) {
+    const sentBack = c1004.steps?.[0]?.decidedAt ?? daysAgoIso(5)
+    m.set(c1004.id, [{ id: 1, author: RAHUL, text: CLARIFICATION_QUESTION, createdAt: sentBack }])
+  }
+  return m
+}
+
+/** Audit timeline derived from a claim (the real backend reads its append-only audit table). */
+export function auditFor(c: Claim, extra: AuditEvent[] = []): AuditEvent[] {
+  const ev: AuditEvent[] = []
+  let id = c.id * 100
+  const push = (at: string | undefined, action: string, actor?: UserRef, more: Partial<AuditEvent> = {}) => {
+    if (at) ev.push({ id: id++, at, action, actor, entityType: 'CLAIM', entityId: String(c.id), ...more })
+  }
+  push(c.createdAt, 'CLAIM_CREATED', c.employee)
+  if (c.submittedAt) {
+    push(c.submittedAt, 'CLAIM_SUBMITTED', c.employee)
+    const outcome =
+      c.policyResult?.outcome ??
+      (c.status === 'AUTO_REJECTED' ? 'AUTO_REJECTED' : (c.steps ?? []).length ? 'ROUTED' : 'AUTO_APPROVED')
+    push(c.submittedAt, `POLICY_${outcome}`, undefined, { after: { outcome } })
+  }
+  for (const s of c.steps ?? []) {
+    if (s.decision === 'PENDING' || !s.decidedAt) continue
+    const action = { APPROVED: 'STEP_APPROVED', REJECTED: 'STEP_REJECTED', SENT_BACK: 'CLAIM_SENT_BACK', SUPERSEDED: 'STEP_SUPERSEDED' }[
+      s.decision
+    ]
+    push(s.decidedAt, action ?? `STEP_${s.decision}`, s.actedBy ?? s.assignee, {
+      onBehalfOf: s.onBehalfOf,
+      after: { level: s.level, ...(s.comment ? { comment: s.comment } : {}) },
+    })
+  }
+  if (c.status === 'IN_PAYOUT' || c.status === 'PAID') push(c.decidedAt ?? c.submittedAt, 'ADDED_TO_PAYOUT_BATCH', FARHAN)
+  if (c.status === 'PAID') push(c.decidedAt ?? c.submittedAt, 'CLAIM_PAID')
+  return [...ev, ...extra].sort((a, b) => a.at.localeCompare(b.at))
 }
 
 export function toSummary(c: Claim): ClaimSummary {
