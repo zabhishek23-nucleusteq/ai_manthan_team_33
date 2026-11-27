@@ -1,8 +1,6 @@
-import { LogoutOutlined } from '@ant-design/icons'
-import { Button, Menu, Typography } from 'antd'
+import { Menu, Typography } from 'antd'
 import type { ReactNode } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useAuth } from '../auth/authContext'
+import { Link, useLocation } from 'react-router-dom'
 
 const ITEMS = [
   { key: '/admin', label: 'Overview' },
@@ -14,23 +12,9 @@ const ITEMS = [
 /** Super admin section frame: title + section navigation (works at 360px: the menu collapses into "…"). */
 export function AdminShell({ title, extra, children }: { title: string; extra?: ReactNode; children: ReactNode }) {
   const { pathname } = useLocation()
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
   return (
-    <main style={{ padding: 16, maxWidth: 1200, margin: '0 auto' }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', justifyContent: 'flex-end' }}>
-        <Typography.Text type="secondary">Logged in as {user?.name ?? ''}</Typography.Text>
-        <Button
-          size="small"
-          icon={<LogoutOutlined />}
-          onClick={() => {
-            logout()
-            navigate('/login', { replace: true })
-          }}
-        >
-          Log out
-        </Button>
-      </div>
+    // User name and Log out live in the app header (src/app/AppLayout.tsx).
+    <main style={{ maxWidth: 1200, margin: '0 auto' }}>
       <nav aria-label="Admin sections">
         <Menu
           mode="horizontal"
