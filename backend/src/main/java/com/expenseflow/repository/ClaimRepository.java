@@ -30,4 +30,13 @@ public interface ClaimRepository extends JpaRepository<Claim, Long> {
     Optional<Claim> findByIdForUpdate(Long id);
 
     boolean existsByCode(String code);
+
+    /**
+     * BR-18 payable claims, locked for the caller's transaction. SKIP LOCKED: a concurrent batch creation skips rows
+     * already taken, so no claim can land in two batches (payout_items.claim_id is unique as the last guard).
+     */
+    @Query(value = "select c.id from claims c where c.status = 'APPROVED' and c.sample_audit not in ('PENDING', 'EXCEPTION') "
+            + "and not exists (select 1 from payout_items i where i.claim_id = c.id) order by c.id for update skip locked",
+            nativeQuery = true)
+    java.util.List<Long> lockPayableClaimIds();
 }

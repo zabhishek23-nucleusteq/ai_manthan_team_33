@@ -54,6 +54,9 @@ public class SecurityConfig {
                 // answer 400 (rbac.md section 3: claims/receipts = EMP, MGR, AUD, HEAD)
                 .requestMatchers("/api/claims", "/api/claims/**", "/api/receipts", "/api/receipts/**")
                     .hasAnyRole("EMPLOYEE", "MANAGER", "FINANCE_AUDITOR", "FINANCE_HEAD")
+                // L2 (T-017): payouts - read/export AUD + HEAD, create/submit HEAD only (before the Idempotency-Key filter)
+                .requestMatchers(HttpMethod.GET, "/api/payout-batches", "/api/payout-batches/**").hasAnyRole("FINANCE_AUDITOR", "FINANCE_HEAD")
+                .requestMatchers("/api/payout-batches", "/api/payout-batches/**").hasRole("FINANCE_HEAD")
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e
                 .authenticationEntryPoint(JsonSecurityErrorHandlers.entryPoint())

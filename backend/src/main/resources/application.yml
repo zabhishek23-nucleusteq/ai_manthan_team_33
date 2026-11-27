@@ -25,6 +25,10 @@ app:
     secret: ${JWT_SECRET:local-dev-only-secret-change-me-0123456789abcdef}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
+  bank:
+    # mock bank service (docker-compose sets MOCK_BANK_URL=http://mock-bank:8081); read timeout for submit (T-017)
+    url: ${MOCK_BANK_URL:http://localhost:8081}
+    timeout: ${MOCK_BANK_TIMEOUT:PT3S}
 
 management:
   endpoints:
