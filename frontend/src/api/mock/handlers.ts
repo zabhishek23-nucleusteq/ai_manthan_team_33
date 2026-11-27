@@ -1,6 +1,6 @@
 import type { ApprovalLevel, Claim, ClaimInput, Violation } from '../types'
 import { buildClaims, DEPARTMENTS, toSummary } from './fixtures'
-import { err, mockRoute, type MockResponse } from './router'
+import { err, mockRoute, type MockRequest, type MockResponse } from './router'
 
 /** In-memory state for the mock backend; reset with resetMockState(). */
 let claims: Claim[] = buildClaims()
@@ -15,9 +15,21 @@ export function resetMockState(): void {
 
 const EDITABLE = new Set(['DRAFT', 'CLARIFICATION_REQUESTED'])
 
-function ownClaim(userId: number | null, id: string): Claim | undefined {
+type Who = Pick<MockRequest, 'userId' | 'email'>
+
+/**
+ * Owner = same email when both sides have one (fixtures belong to the demo employee in mock and real-auth mode;
+ * real backend ids can collide with fixture ids), otherwise same user id.
+ */
+function isOwner(c: Claim, who: Who): boolean {
+  if (!c.employee) return false
+  if (who.email && c.employee.email) return c.employee.email.toLowerCase() === who.email.toLowerCase()
+  return c.employee.id === who.userId
+}
+
+function ownClaim(who: Who, id: string): Claim | undefined {
   // Non-owners get 404, never 403 (no enumeration; rbac.md).
-  return claims.find((c) => String(c.id) === id && c.employee?.id === userId)
+  return claims.find((c) => String(c.id) === id && isOwner(c, who))
 }
 
 function validateInput(body: unknown): MockResponse | ClaimInput {
@@ -105,12 +117,13 @@ export function registerDefaultMocks(): void {
 
   mockRoute('GET', '/api/departments', () => ({ status: 200, body: DEPARTMENTS }))
 
-  mockRoute('GET', '/api/claims', ({ userId, query }) => {
+  mockRoute('GET', '/api/claims', (req) => {
+    const { query } = req
     const status = query.get('status')
     const page = Math.max(0, Number(query.get('page') ?? 0))
     const size = Math.min(100, Math.max(1, Number(query.get('size') ?? 20)))
     const mine = claims
-      .filter((c) => c.employee?.id === userId && (!status || c.status === status))
+      .filter((c) => isOwner(c, req) && (!status || c.status === status))
       .sort((a, b) => (b.submittedAt ?? b.createdAt ?? '').localeCompare(a.submittedAt ?? a.createdAt ?? ''))
     return {
       status: 200,
@@ -118,7 +131,7 @@ export function registerDefaultMocks(): void {
     }
   })
 
-  mockRoute('POST', '/api/claims', ({ userId, body }) => {
+  mockRoute('POST', '/api/claims', ({ userId, email, body }) => {
     const input = validateInput(body)
     if ('status' in input) return input
     const c: Claim = {
@@ -127,7 +140,7 @@ export function registerDefaultMocks(): void {
       title: '',
       status: 'DRAFT',
       total: 0,
-      employee: { id: userId!, name: 'You', email: '' },
+      employee: { id: userId!, name: 'You', email: email ?? '' },
       lines: [],
       steps: [],
       sampleAudit: 'NONE',
@@ -140,13 +153,15 @@ export function registerDefaultMocks(): void {
     return { status: 201, body: c }
   })
 
-  mockRoute('GET', '/api/claims/{id}', ({ userId, params }) => {
-    const c = ownClaim(userId, params.id)
+  mockRoute('GET', '/api/claims/{id}', (req) => {
+    const { params } = req
+    const c = ownClaim(req, params.id)
     return c ? { status: 200, body: c } : err(404, 'NOT_FOUND', 'Claim not found')
   })
 
-  mockRoute('PUT', '/api/claims/{id}', ({ userId, params, body }) => {
-    const c = ownClaim(userId, params.id)
+  mockRoute('PUT', '/api/claims/{id}', (req) => {
+    const { params, body } = req
+    const c = ownClaim(req, params.id)
     if (!c) return err(404, 'NOT_FOUND', 'Claim not found')
     if (!EDITABLE.has(c.status))
       return err(409, 'ILLEGAL_STATE_TRANSITION', `Claim ${c.code} is ${c.status}; cannot edit`, { from: c.status, action: 'edit' })
@@ -157,8 +172,9 @@ export function registerDefaultMocks(): void {
     return { status: 200, body: c }
   })
 
-  mockRoute('DELETE', '/api/claims/{id}', ({ userId, params }) => {
-    const c = ownClaim(userId, params.id)
+  mockRoute('DELETE', '/api/claims/{id}', (req) => {
+    const { params } = req
+    const c = ownClaim(req, params.id)
     if (!c) return err(404, 'NOT_FOUND', 'Claim not found')
     if (!EDITABLE.has(c.status))
       return err(409, 'ILLEGAL_STATE_TRANSITION', `Claim ${c.code} is ${c.status}; cannot delete`, { from: c.status, action: 'delete' })
@@ -166,7 +182,8 @@ export function registerDefaultMocks(): void {
     return { status: 204 }
   })
 
-  mockRoute('POST', '/api/claims/{id}/submit', ({ userId, params, headers }) => {
+  mockRoute('POST', '/api/claims/{id}/submit', (req) => {
+    const { params, headers } = req
     const key = headers['Idempotency-Key']
     if (!key || key.length < 8 || key.length > 64)
       return err(400, 'VALIDATION_FAILED', 'Idempotency-Key header is required (8-64 chars)')
@@ -176,7 +193,7 @@ export function registerDefaultMocks(): void {
         ? seen.response
         : err(422, 'IDEMPOTENCY_KEY_REUSED', 'This Idempotency-Key was used for another request')
     }
-    const c = ownClaim(userId, params.id)
+    const c = ownClaim(req, params.id)
     if (!c) return err(404, 'NOT_FOUND', 'Claim not found')
     if (!EDITABLE.has(c.status))
       return err(409, 'ILLEGAL_STATE_TRANSITION', `Claim ${c.code} is ${c.status}; cannot submit`, { from: c.status, action: 'submit' })

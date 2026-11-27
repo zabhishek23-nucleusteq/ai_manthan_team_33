@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AuthLayout } from './AuthLayout'
 import { useAuth } from './authContext'
-import { isMockMode } from './authApi'
+import { isMockAuth } from './authApi'
 import { DEMO_PASSWORD } from './mockAuth'
 import { landingRouteFor, safeNext } from './roles'
 import { ApiError, type LoginRequest } from './types'
@@ -98,7 +98,7 @@ export function LoginPage() {
         New here? <Link to="/signup">Create an account</Link>
       </Typography.Paragraph>
 
-      {isMockMode() || import.meta.env.DEV ? (
+      {isMockAuth() || import.meta.env.DEV ? (
         <Collapse
           ghost
           size="small"

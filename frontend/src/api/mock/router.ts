@@ -9,8 +9,10 @@ export interface MockRequest {
   query: URLSearchParams
   headers: Record<string, string>
   body: unknown
-  /** user id from the mock bearer token, or null when missing/invalid */
+  /** user id (`sub`) from the bearer token (mock or real JWT), or null when missing/invalid */
   userId: number | null
+  /** `email` claim; lets fixtures owned by the demo employee work with a real backend login too */
+  email: string | null
   roles: string[]
 }
 
@@ -54,15 +56,35 @@ export const err = (status: number, code: string, message: string, details?: Rec
   body: { code, message, ...(details ? { details } : {}) },
 })
 
-function decodeToken(auth: string | undefined): { userId: number | null; roles: string[] } {
+/** JWT payloads are base64url without padding; atob needs standard base64. */
+export function decodeBase64Url(s: string): string {
+  const b64 = s.replace(/-/g, '+').replace(/_/g, '/')
+  return atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4))
+}
+
+interface TokenInfo {
+  userId: number | null
+  email: string | null
+  roles: string[]
+}
+
+/** Reads (does not verify) a mock token or a real backend JWT (sub = user id, email, roles). */
+export function decodeToken(auth: string | undefined): TokenInfo {
+  const none: TokenInfo = { userId: null, email: null, roles: [] }
   const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null
-  if (!token) return { userId: null, roles: [] }
+  if (!token) return none
   try {
-    const p = JSON.parse(atob(token.split('.')[1])) as { sub: string; roles?: string[]; exp?: number }
-    if (p.exp && p.exp * 1000 < Date.now()) return { userId: null, roles: [] }
-    return { userId: Number(p.sub), roles: p.roles ?? [] }
+    const p = JSON.parse(decodeBase64Url(token.split('.')[1])) as {
+      sub: string
+      email?: string
+      roles?: string[]
+      exp?: number
+    }
+    if (p.exp && p.exp * 1000 < Date.now()) return none
+    const id = Number(p.sub)
+    return Number.isFinite(id) ? { userId: id, email: p.email ?? null, roles: p.roles ?? [] } : none
   } catch {
-    return { userId: null, roles: [] }
+    return none
   }
 }
 
@@ -93,13 +115,13 @@ export async function handleMockRequest(
     if (r.method !== m) continue
     const match = r.pattern.exec(u.pathname)
     if (!match) continue
-    const { userId, roles } = decodeToken(headers.Authorization)
+    const { userId, email, roles } = decodeToken(headers.Authorization)
     if (!r.public && userId === null) {
       out = err(401, 'UNAUTHENTICATED', 'Authentication required')
       break
     }
     const params = Object.fromEntries(r.keys.map((k, i) => [k, decodeURIComponent(match[i + 1])]))
-    out = await r.handler({ method: m, path: u.pathname, params, query: u.searchParams, headers, body, userId, roles })
+    out = await r.handler({ method: m, path: u.pathname, params, query: u.searchParams, headers, body, userId, email, roles })
     break
   }
   const hasBody = out.body !== undefined && out.status !== 204
