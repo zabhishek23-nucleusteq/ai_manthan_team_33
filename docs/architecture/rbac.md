@@ -61,5 +61,5 @@ Everything under `/api/**` except `/api/auth/signup` and `/api/auth/login` needs
 | EMPLOYEE + MANAGER | `manager@expenseflow.test` | Rahul Manager | Engineering; has pending approvals |
 | EMPLOYEE + FINANCE_AUDITOR | `auditor@expenseflow.test` | Anita Auditor | audit queue with sample audits |
 | EMPLOYEE + FINANCE_HEAD + SUPER_ADMIN | `head@expenseflow.test` | Farhan Head | payouts, policy rules, admin |
-| SUPER_ADMIN | `admin@expenseflow.test` | Sam Admin | admin only |
+| SUPER_ADMIN | `admin@expenseflow.test` | Abhishek Admin | admin only |
 | EMPLOYEE + MANAGER | `manager2@expenseflow.test` | Meera Backup | delegate target for leave demo |

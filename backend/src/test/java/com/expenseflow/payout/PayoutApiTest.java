@@ -259,6 +259,24 @@ class PayoutApiTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void eligible_previewsWhatCreateWouldTake_withoutLocking_T031() throws Exception {
+        JsonNode before = body(call("GET", "/api/payout-batches/eligible", head));
+        approvedClaim("1000.00", SampleAudit.NONE);
+        approvedClaim("250.25", SampleAudit.OK);
+        approvedClaim("999.00", SampleAudit.PENDING); // not payable (BR-18)
+        HttpResponse<String> r = call("GET", "/api/payout-batches/eligible", token("EMPLOYEE", "FINANCE_AUDITOR"));
+        assertThat(r.statusCode()).isEqualTo(200);
+        JsonNode after = body(r);
+        assertThat(after.get("count").asLong() - before.get("count").asLong()).isEqualTo(2);
+        assertThat(after.get("total").decimalValue().subtract(before.get("total").decimalValue())).isEqualByComparingTo("1250.25");
+        assertThat(call("GET", "/api/payout-batches/eligible", token("EMPLOYEE", "MANAGER")).statusCode()).isEqualTo(403);
+
+        long id = createBatch();
+        assertThat(body(call("GET", "/api/payout-batches/" + id, head)).get("itemCount").asLong()).isEqualTo(after.get("count").asLong());
+        assertThat(body(call("GET", "/api/payout-batches/eligible", head)).get("count").asLong()).isZero();
+    }
+
+    @Test
     void payable_excludesPendingSampleAudit() throws Exception {
         Claim pending = approvedClaim("700.00", SampleAudit.PENDING);
         Claim exception = approvedClaim("710.00", SampleAudit.EXCEPTION);

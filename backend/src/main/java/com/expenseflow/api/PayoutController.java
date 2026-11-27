@@ -63,7 +63,14 @@ public class PayoutController {
         return new PayoutBatchPage(items, page, size, total[0]);
     }
 
-    @GetMapping("/{id}")
+    /** Claims a new batch would take now (count + total INR) so the UI can confirm before POST (T-031). */
+    @GetMapping("/eligible")
+    @PreAuthorize("hasAnyRole('FINANCE_AUDITOR','FINANCE_HEAD')")
+    public PayoutService.Eligible eligible() {
+        return service.eligible();
+    }
+
+    @GetMapping("/{id:\\d+}")
     @PreAuthorize("hasAnyRole('FINANCE_AUDITOR','FINANCE_HEAD')")
     public PayoutBatchDto get(@PathVariable long id) {
         return service.read(id, b -> toDto(b, true));
