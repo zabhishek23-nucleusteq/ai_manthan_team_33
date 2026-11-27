@@ -40,7 +40,8 @@ export interface PolicyRule {
   limitAmount?: number | null
   unit?: string | null
   params?: Record<string, unknown> | null
-  action?: PolicyAction | null
+  /** The real API sends "CONFIG" for setting rows (no route/reject outcome); older payloads may send null. */
+  action?: PolicyAction | 'CONFIG' | null
   enabled: boolean
   updatedAt?: string
 }
@@ -53,7 +54,7 @@ export interface PolicyRuleInput {
 }
 
 /** A row without an action is a setting (BR-9/11/12/13 thresholds), not a rule that flags lines. */
-export const isSetting = (r: Pick<PolicyRule, 'action'>): boolean => !r.action
+export const isSetting = (r: Pick<PolicyRule, 'action'>): boolean => r.action !== 'ROUTE' && r.action !== 'REJECT'
 
 /** SAMPLE_AUDIT_RATE is a share (0..1), every other limit is INR. */
 export const isRate = (r: Pick<PolicyRule, 'code'>): boolean => r.code === 'SAMPLE_AUDIT_RATE'

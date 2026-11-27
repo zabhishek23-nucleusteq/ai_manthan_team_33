@@ -62,8 +62,33 @@ test.fixme('TC-12 auditor bulk-approves from the audit queue', async () => {
   // needs: auditor queue API (T-020) and UI (T-026)
 });
 
-test.fixme('TC-13 finance head creates a payout batch and downloads the bank CSV', async () => {
-  // needs: payout batch API (T-017) and UI (T-031)
+test('TC-13 finance head creates a payout batch and downloads the bank CSV', async ({ page }) => {
+  await loginAs(page, DEMO_USERS[3]);
+  await page.goto('/payouts');
+  await expect(page.getByRole('heading', { name: 'Payout batches' })).toBeVisible();
+  await page.getByRole('button', { name: /Create batch/ }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Create payout batch' });
+  const create = dialog.getByRole('button', { name: /^Create batch/ });
+  // The confirm shows count + total once /eligible answers; with nothing approved, open an existing batch instead.
+  await expect(dialog.getByText(/approved claim|No approved claims/)).toBeVisible({ timeout: 10_000 });
+  if (await create.isEnabled()) {
+    await create.click();
+  } else {
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await page.getByRole('button', { name: /^PB-\d+/ }).first().click();
+  }
+  // Batch drawer (antd 6 markup differs from v5, so locate by text/role rather than drawer CSS classes)
+  await expect(page.getByText(/^Batch PB-\d+$/)).toBeVisible({ timeout: 10_000 });
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: /Download CSV/ }).click()]);
+  expect(download.suggestedFilename()).toMatch(/^PB-\d+\.csv$/);
+});
+
+test('TC-13b policy rules page shows the rules to the finance head with Edit (T-031)', async ({ page }) => {
+  await loginAs(page, DEMO_USERS[3]);
+  await page.goto('/policy-rules');
+  await expect(page.getByRole('heading', { name: 'Policy rules' })).toBeVisible();
+  await expect(page.getByText('MEAL_DAILY_LIMIT').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit MEAL_DAILY_LIMIT' })).toBeVisible();
 });
 
 test('TC-14 dashboard date presets 1D / 7D / 1M change the numbers', async ({ page }) => {

@@ -10,7 +10,7 @@ import { ThemeProvider } from '../../design/ThemeProvider'
 import { AuthProvider } from '../auth/AuthProvider'
 import { resetSessionCacheForTests, setSession } from '../auth/session'
 import type { Role } from '../auth/types'
-import { checkLimit } from './financeApi'
+import { checkLimit, isSetting } from './financeApi'
 import { setMockBankFailures, setMockEligible } from './financeMocks'
 import { limitText } from './financeFormat'
 
@@ -143,6 +143,17 @@ describe('Policy rules (T-031)', () => {
     expect(checkLimit({ code: 'SAMPLE_AUDIT_RATE' }, 1)).toBeNull()
     expect(checkLimit({ code: 'MEAL_DAILY_LIMIT' }, -1)).toBe('The value cannot be negative')
     expect(checkLimit({ code: 'MEAL_DAILY_LIMIT' }, 0)).toBeNull()
+  })
+
+  it('renders setting rows sent as action CONFIG by the real API (blank-page bug)', async () => {
+    loginAs(HEAD)
+    renderApp('/policy-rules')
+    expect(await screen.findByRole('heading', { name: 'Policy rules' })).toBeInTheDocument()
+    expect((await screen.findAllByText('Setting')).length).toBe(4)
+    expect(screen.getByText('10%')).toBeInTheDocument()
+    expect(isSetting({ action: 'CONFIG' })).toBe(true)
+    expect(isSetting({ action: null })).toBe(true)
+    expect(isSetting({ action: 'ROUTE' })).toBe(false)
   })
 
   it('manager sees the rules read-only', async () => {
