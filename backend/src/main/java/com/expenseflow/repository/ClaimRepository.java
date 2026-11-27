@@ -19,6 +19,11 @@ public interface ClaimRepository extends JpaRepository<Claim, Long> {
 
     Page<Claim> findByEmployeeId(Long employeeId, Pageable pageable);
 
+    Page<Claim> findByEmployeeIdAndStatus(Long employeeId, com.expenseflow.domain.ClaimStatus status, Pageable pageable);
+
+    @Query(value = "select nextval('claim_code_seq')", nativeQuery = true)
+    long nextCodeNumber();
+
     /** Row lock for state transitions (approve / reject / send back / payout). */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from Claim c where c.id = :id")

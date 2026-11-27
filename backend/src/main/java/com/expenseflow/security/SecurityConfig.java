@@ -50,6 +50,10 @@ public class SecurityConfig {
                 // Role check in the filter chain, before body parsing/validation: a non-admin always gets 403,
                 // never a 400 that leaks the request schema (@PreAuthorize on AdminController stays as 2nd layer).
                 .requestMatchers("/api/admin/**").hasRole("SUPER_ADMIN")
+                // L2 (T-016): same for claims/receipts - 403 before body validation or the Idempotency-Key filter can
+                // answer 400 (rbac.md section 3: claims/receipts = EMP, MGR, AUD, HEAD)
+                .requestMatchers("/api/claims", "/api/claims/**", "/api/receipts", "/api/receipts/**")
+                    .hasAnyRole("EMPLOYEE", "MANAGER", "FINANCE_AUDITOR", "FINANCE_HEAD")
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e
                 .authenticationEntryPoint(JsonSecurityErrorHandlers.entryPoint())

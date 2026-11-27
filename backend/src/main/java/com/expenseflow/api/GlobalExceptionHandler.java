@@ -82,6 +82,34 @@ public class GlobalExceptionHandler {
                 "Someone else changed this record. Reload and try again."));
     }
 
+    /** Files above the multipart limit never reach ReceiptService; same answer as its 5 MB check (BR-20). */
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    ResponseEntity<ApiError> uploadTooLarge(org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(ApiError.of(ErrorCodes.RECEIPT_TOO_LARGE, "Receipts can be at most 5 MB"));
+    }
+
+    /** Missing multipart file / not a multipart request: client errors, not 500 (missing query params: missingParam above). */
+    @ExceptionHandler({org.springframework.web.multipart.support.MissingServletRequestPartException.class,
+            org.springframework.web.multipart.MultipartException.class})
+    ResponseEntity<ApiError> missingPart(Exception ex) {
+        return ResponseEntity.badRequest().body(ApiError.of(ErrorCodes.VALIDATION_FAILED,
+                "Required request part or parameter is missing (multipart field 'file' for receipts)"));
+    }
+
+    /** Wrong Content-Type for the endpoint (e.g. JSON sent to the multipart receipt upload): 415, not 500. */
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+    ResponseEntity<ApiError> mediaType(org.springframework.web.HttpMediaTypeNotSupportedException ex) {
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(ApiError.of(ErrorCodes.MALFORMED_REQUEST,
+                "Content-Type " + ex.getContentType() + " is not supported here"));
+    }
+
+    /** Wrong HTTP method on an existing path: 405, not 500. */
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    ResponseEntity<ApiError> method(org.springframework.web.HttpRequestMethodNotSupportedException ex) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(ApiError.of(ErrorCodes.MALFORMED_REQUEST,
+                "Method " + ex.getMethod() + " is not allowed here"));
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     ResponseEntity<ApiError> forbidden(AccessDeniedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiError.of("FORBIDDEN", "You do not have access to this resource"));
