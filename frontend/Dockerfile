@@ -6,8 +6,8 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 # In-browser mock for /api until the backend endpoints exist (claims: T-016); --build-arg VITE_MOCK=0 for all-real.
 ARG VITE_MOCK=1
-# Auth separately: 0 = real login against the backend. Stays 1 until demo users are seeded (T-013).
-ARG VITE_MOCK_AUTH=1
+# Auth separately: 0 = real login against the backend (demo users seeded by T-013); 1 = mock logins.
+ARG VITE_MOCK_AUTH=0
 ENV VITE_MOCK=$VITE_MOCK VITE_MOCK_AUTH=$VITE_MOCK_AUTH
 RUN npm run build
 
