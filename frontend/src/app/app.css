@@ -1,0 +1,13 @@
+.ef-skip-link {
+  position: absolute;
+  left: 8px;
+  top: -48px;
+  z-index: 100;
+  padding: 8px 12px;
+  background: #ffffff;
+  color: #0958d9;
+  border-radius: 6px;
+}
+.ef-skip-link:focus {
+  top: 8px;
+}
