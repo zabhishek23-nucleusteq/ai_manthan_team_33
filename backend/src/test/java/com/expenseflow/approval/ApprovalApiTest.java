@@ -220,6 +220,26 @@ class ApprovalApiTest extends AbstractIntegrationTest {
         assertThat(audit(id, "CLAIM_APPROVED")).isEqualTo(1);
     }
 
+    @Test
+    void auditorLevel_isTeamPool_anyAuditorActsOnBehalf() throws Exception {
+        Who emp = employeeOf(manager);
+        long id = routedClaim(emp, "25000.01");
+        assertThat(status(approve(manager, id))).isEqualTo("PENDING_AUDITOR");
+        long assigned = openStep(emp, id).get("assignee").get("id").asLong();
+        Who otherAuditor = user(null, Role.EMPLOYEE, Role.FINANCE_AUDITOR);   // not the assignee
+
+        JsonNode inbox = body(send("GET", "/api/approvals/inbox?size=100", otherAuditor, null));
+        assertThat(inbox.get("items").findValues("claimId").stream().map(JsonNode::asLong)).contains(id);
+        JsonNode queue = body(send("GET", "/api/audit-queue?size=100", otherAuditor, null));
+        assertThat(queue.toString()).contains("\"" + claim(emp, id).get("code").asString() + "\"");
+
+        assertThat(approve(user(null, Role.EMPLOYEE, Role.MANAGER), id).statusCode()).as("manager is not in the pool").isEqualTo(403);
+        assertThat(status(approve(otherAuditor, id))).isEqualTo("APPROVED");
+        JsonNode step = claim(emp, id).get("steps").get(1);
+        assertThat(step.get("actedBy").get("id").asLong()).isEqualTo(otherAuditor.id());
+        assertThat(step.get("onBehalfOf").get("id").asLong()).isEqualTo(assigned);
+    }
+
     // ------------------------------------------------------------------ BR-15 no self-approval
     @Test
     void selfApproval_escalates() throws Exception {

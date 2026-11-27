@@ -87,7 +87,7 @@ EMPLOYEE (self sign-up) · MANAGER · FINANCE_AUDITOR · FINANCE_HEAD (+SUPER_AD
 - BR-20 Receipt PDF/JPG/PNG <= 5 MB · BR-21 seed 150 employees, 8 departments, 3,000 claims
 
 ### Invariants
-1. Employee sees only own claims (others -> 404). 2. Approver never acts on own claim. 3. Only the assigned approver (or active delegate) acts on an open step. 4. Lines are editable only in DRAFT/CLARIFICATION_REQUESTED. 5. A claim is in at most one payout batch and is paid once. 6. `audit_events` is append-only (DB trigger) and every state change writes one in the same transaction. 7. Every state-changing POST takes `Idempotency-Key`. 8. Policy results are stored with a rule snapshot; rule changes do not rewrite history. 9. Every KPI endpoint takes `from`/`to` (NFR-DASH).
+1. Employee sees only own claims (others -> 404). 2. Approver never acts on own claim. 3. Only the assigned approver (or active delegate) acts on an open step; the AUDITOR level is a team pool (any FINANCE_AUDITOR, recorded on behalf of the assignee - ADR-001 amendment). 4. Lines are editable only in DRAFT/CLARIFICATION_REQUESTED. 5. A claim is in at most one payout batch and is paid once. 6. `audit_events` is append-only (DB trigger) and every state change writes one in the same transaction. 7. Every state-changing POST takes `Idempotency-Key`. 8. Policy results are stored with a rule snapshot; rule changes do not rewrite history. 9. Every KPI endpoint takes `from`/`to` (NFR-DASH).
 
 ### Sprint plan (build window 3 hours; sprint = 1 hour; review gate T-90x at the end of each)
 | Sprint | Hour | Showable result |

@@ -89,6 +89,13 @@ public class ApproverDirectory {
                 .setParameter("u", delegateId).setParameter("today", today()).getResultList();
     }
 
+    /** All open AUDITOR-level steps (the finance auditor team pool). */
+    List<com.expenseflow.domain.ApprovalStep> openAuditorSteps() {
+        return em.createQuery("select s from ApprovalStep s where s.level = :lvl and s.decision is null order by s.createdAt, s.id",
+                        com.expenseflow.domain.ApprovalStep.class)
+                .setParameter("lvl", ApprovalLevel.AUDITOR).getResultList();
+    }
+
     boolean hasActiveOverlap(Long userId, boolean asDelegator, LocalDate from, LocalDate to) {
         String side = asDelegator ? "d.delegator.id" : "d.delegate.id";
         return em.createQuery("select count(d) from Delegation d where " + side + " = :u and d.active = true"
