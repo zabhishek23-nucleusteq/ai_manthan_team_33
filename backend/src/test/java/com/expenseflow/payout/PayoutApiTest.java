@@ -329,6 +329,32 @@ class PayoutApiTest extends AbstractIntegrationTest {
         assertThat(call("POST", "/api/payout-batches/" + id + "/submit", head).statusCode()).as("already paid").isEqualTo(409);
     }
 
+    /** T-606: L3's SRE metrics (Grafana panels + alerts) see every bank submit with its outcome and latency. */
+    @Test
+    void bankSubmit_recordsSreMetrics_successFailureAndLatency() throws Exception {
+        double okBefore = meters.counter("payouts", "outcome", "success").count();
+        double failBefore = meters.counter("payouts", "outcome", "failure").count();
+        long timedBefore = meters.timer("external.call", "target", "bank", "outcome", "success").count();
+
+        approvedClaim("150.00", SampleAudit.NONE);
+        long ok = createBatch();
+        assertThat(call("POST", "/api/payout-batches/" + ok + "/submit", head).statusCode()).isEqualTo(200);
+
+        Claim rejectedOnly = approvedClaim("160.00", SampleAudit.NONE);
+        long rejected = createBatch();
+        rejectCodes.add(rejectedOnly.getCode());                     // bank answers 200 but REJECTED -> failure
+        assertThat(call("POST", "/api/payout-batches/" + rejected + "/submit", head).statusCode()).isEqualTo(502);
+
+        approvedClaim("170.00", SampleAudit.NONE);
+        long broken = createBatch();
+        mode = Mode.ERROR_500;
+        assertThat(call("POST", "/api/payout-batches/" + broken + "/submit", head).statusCode()).isEqualTo(502);
+
+        assertThat(meters.counter("payouts", "outcome", "success").count()).isEqualTo(okBefore + 1);
+        assertThat(meters.counter("payouts", "outcome", "failure").count()).isEqualTo(failBefore + 2);
+        assertThat(meters.timer("external.call", "target", "bank", "outcome", "success").count()).isEqualTo(timedBefore + 1);
+    }
+
     @Test
     void submit_bank500_failed() throws Exception {
         Claim a = approvedClaim("640.00", SampleAudit.NONE);
