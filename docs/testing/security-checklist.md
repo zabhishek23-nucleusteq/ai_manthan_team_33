@@ -18,8 +18,8 @@ Scope limit: receipt upload/download (T-016), approvals, payouts and CSV export 
 | 10 | A05 Misconfiguration | `/actuator/env`, `/actuator/heapdump` not exposed | Pass | probe: 401 |
 | 11 | A05 | `/actuator/prometheus` and `/v3/api-docs` are public | Accepted risk | Needed for Prometheus and the demo; in production restrict to the internal network |
 | 12 | A05 | Security headers on the API | Pass | `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Cache-Control: no-store` |
-| 13 | A05 | Security headers on the frontend (nginx) | **Fail** | only `Server: nginx/1.29.8`; bug **T-508** |
-| 14 | A07 Auth failures | Brute-force protection on login | **Fail** | 25 wrong passwords all 401, correct one accepted right after; bug **T-507** |
+| 13 | A05 | Security headers on the frontend (nginx) | Pass after fix | bug T-508 fixed; verified CSP, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy` |
+| 14 | A07 Auth failures | Brute-force protection on login | Pass after fix | bug T-507 fixed; verified: 5 wrong passwords -> 401, then 429 |
 | 15 | A07 | No user enumeration on login | Pass | unknown email and wrong password return identical body; dummy BCrypt hash equalises timing |
 | 16 | A08 Integrity | CSRF | Not applicable | stateless Bearer tokens, no cookies; CSRF disabled deliberately |
 | 17 | A06 Vulnerable components | Frontend dependencies | Pass | `npm audit --omit=dev --audit-level=high` in CI: 0 vulnerabilities |
