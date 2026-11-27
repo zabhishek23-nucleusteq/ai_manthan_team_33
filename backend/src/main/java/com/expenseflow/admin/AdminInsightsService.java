@@ -25,7 +25,7 @@ import com.expenseflow.admin.AdminDtos.AuditEventView;
 import com.expenseflow.admin.AdminDtos.Health;
 import com.expenseflow.admin.AdminDtos.Overview;
 import com.expenseflow.admin.AdminDtos.Page;
-import com.expenseflow.admin.AdminDtos.Range;
+import com.expenseflow.dashboard.KpiService;
 import com.expenseflow.admin.AdminDtos.ServiceStatus;
 import com.expenseflow.audit.AuditEvent;
 import com.expenseflow.dashboard.DateRange;
@@ -48,16 +48,18 @@ public class AdminInsightsService {
     private final JdbcTemplate jdbc;
     private final JsonMapper json;
     private final HttpErrorRateTracker errorRate;
+    private final KpiService kpis;
     private final RestClient mockBank;
     private final Clock clock = Clock.systemUTC();
 
     public AdminInsightsService(EntityManager em, UserRepository users, JdbcTemplate jdbc, JsonMapper json,
-            HttpErrorRateTracker errorRate, @Value("${MOCK_BANK_URL:http://localhost:8081}") String mockBankUrl) {
+            HttpErrorRateTracker errorRate, KpiService kpis, @Value("${MOCK_BANK_URL:http://localhost:8081}") String mockBankUrl) {
         this.em = em;
         this.users = users;
         this.jdbc = jdbc;
         this.json = json;
         this.errorRate = errorRate;
+        this.kpis = kpis;
         SimpleClientHttpRequestFactory rf = new SimpleClientHttpRequestFactory();
         rf.setConnectTimeout(Duration.ofSeconds(1));
         rf.setReadTimeout(Duration.ofSeconds(2));
@@ -116,7 +118,7 @@ public class AdminInsightsService {
     // ---- overview ----
 
     @Transactional(readOnly = true)
-    public Overview overview(DateRange range) {
+    public Overview overview(DateRange range, long adminId, java.util.Collection<String> roles) {
         Map<String, Long> byRole = new LinkedHashMap<>();
         for (String code : List.of(Role.EMPLOYEE, Role.MANAGER, Role.FINANCE_AUDITOR, Role.FINANCE_HEAD,
                 Role.SUPER_ADMIN)) {
@@ -128,7 +130,7 @@ public class AdminInsightsService {
                 .getSingleResult();
         long newUsers = em.createQuery("select count(u) from User u where u.createdAt >= :from and u.createdAt < :to",
                 Long.class).setParameter("from", range.from()).setParameter("to", range.to()).getSingleResult();
-        return new Overview(new Range(range.from(), range.to()), "ALL", byRole, active, users.count(), newUsers);
+        return new Overview(kpis.kpis(range, adminId, roles, null), byRole, active, users.count(), newUsers);
     }
 
     // ---- health ----

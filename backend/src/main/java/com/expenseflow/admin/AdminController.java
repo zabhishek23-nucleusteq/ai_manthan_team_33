@@ -75,8 +75,11 @@ public class AdminController {
     }
 
     @GetMapping("/overview")
-    public Overview overview(@RequestParam(required = false) String from, @RequestParam(required = false) String to) {
-        return insights.overview(DateRange.parse(from, to));
+    public Overview overview(@RequestParam(required = false) String from, @RequestParam(required = false) String to,
+            @AuthenticationPrincipal Jwt jwt) {
+        java.util.List<String> roles = jwt.getClaimAsStringList(com.expenseflow.security.JwtTokenService.ROLES_CLAIM);
+        return insights.overview(DateRange.parse(from, to), Long.parseLong(jwt.getSubject()),
+                roles == null ? java.util.List.of() : roles);
     }
 
     private static int page(int page) {
