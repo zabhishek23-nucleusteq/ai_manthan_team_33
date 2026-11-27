@@ -3,7 +3,7 @@
 Generated from `tests/e2e/api/rbac.spec.ts`, which encodes `docs/architecture/rbac.md` section 3.
 Regenerate: start the stack (`./start.ps1`), then in `tests/e2e`: `npm run test:api; npm run rbac:summary`.
 
-Last run: 2026-11-27 - **61 passed, 0 failed, 2 known bugs, 60 skipped** of 123.
+Last run: 2026-11-27 - **63 passed, 0 failed, 0 known bugs, 60 skipped** of 123.
 
 Per endpoint: (1) no token -> 401; (2) an allowed role is not 401/403/5xx; (3) a role without access -> 403.
 Checks 2 and 3 are skipped until the endpoint is in `/v3/api-docs` and the seeded demo users (T-013) can log in; skips are not passes.
@@ -116,10 +116,10 @@ KNOWN BUG = the backend deviates from rbac.md; the check is expected to fail unt
 | GET /api/admin/users: a role without access -> 403 | pass |  |
 | POST /api/admin/users: no token -> 401 | pass |  |
 | POST /api/admin/users: allowed role is not rejected | pass |  |
-| POST /api/admin/users: a role without access -> 403 | KNOWN BUG | T-502: 400 instead of 403 (body validated before @PreAuthorize) |
+| POST /api/admin/users: a role without access -> 403 | pass |  |
 | PUT /api/admin/users/{id}/roles: no token -> 401 | pass |  |
 | PUT /api/admin/users/{id}/roles: allowed role is not rejected | pass |  |
-| PUT /api/admin/users/{id}/roles: a role without access -> 403 | KNOWN BUG | T-502: 400 instead of 403 (body validated before @PreAuthorize) |
+| PUT /api/admin/users/{id}/roles: a role without access -> 403 | pass |  |
 | PATCH /api/admin/users/{id}: no token -> 401 | pass |  |
 | PATCH /api/admin/users/{id}: allowed role is not rejected | pass |  |
 | PATCH /api/admin/users/{id}: a role without access -> 403 | pass |  |
