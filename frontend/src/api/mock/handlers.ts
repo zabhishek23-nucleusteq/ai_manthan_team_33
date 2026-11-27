@@ -1,6 +1,7 @@
 import type { ApprovalLevel, AuditEvent, Claim, ClaimInput, Comment, Violation } from '../types'
 import { auditFor, buildClaims, buildComments, DEPARTMENTS, toSummary } from './fixtures'
 import { err, mockRoute, type MockRequest, type MockResponse } from './router'
+import { registerApprovalMocks, resetApprovalMocks } from '../../features/staff/approvalsMock'
 
 /** In-memory state for the mock backend; reset with resetMockState(). */
 let claims: Claim[] = buildClaims()
@@ -18,6 +19,7 @@ export function resetMockState(): void {
   nextCommentId = 100
   idempotency.clear()
   extraAudit.clear()
+  resetApprovalMocks()
 }
 
 const addAudit = (claimId: number, e: AuditEvent) => extraAudit.set(claimId, [...(extraAudit.get(claimId) ?? []), e])
@@ -187,7 +189,8 @@ export function registerDefaultMocks(): void {
 
   mockRoute('GET', '/api/claims/{id}', (req) => {
     const { params } = req
-    const c = ownClaim(req, params.id)
+    const approver = req.roles.some((r) => ['MANAGER', 'FINANCE_AUDITOR', 'FINANCE_HEAD'].includes(r))
+    const c = ownClaim(req, params.id) ?? (approver ? claims.find((x) => String(x.id) === params.id && !isOwner(x, req) && x.status.startsWith('PENDING_')) : undefined)
     return c ? { status: 200, body: c } : err(404, 'NOT_FOUND', 'Claim not found')
   })
 
@@ -242,4 +245,7 @@ export function registerDefaultMocks(): void {
     idempotency.set(key, { claimId: c.id, response })
     return response
   })
+
+  // T-025: approvals + delegations (approver views of the same in-memory claims)
+  registerApprovalMocks(() => claims)
 }
