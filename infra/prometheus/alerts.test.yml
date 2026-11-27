@@ -1,0 +1,58 @@
+# Unit tests for alerts.yml: docker run --rm --entrypoint promtool -v "$PWD/infra/prometheus:/etc/prometheus:ro" \
+#   prom/prometheus:v3.5.0 test rules /etc/prometheus/alerts.test.yml
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 15s
+
+tests:
+  # Normal case: counter scraped at 0, one failure -> fires after the 1m hold.
+  - interval: 15s
+    input_series:
+      - series: 'payouts_total{application="expenseflow",outcome="failure",job="backend",instance="backend:8080"}'
+        values: '0 0 0 1 1 1 1 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 2m30s
+        alertname: BankPayoutFailures
+        exp_alerts:
+          - exp_labels: { severity: SEV2, application: expenseflow, outcome: failure, job: backend, instance: "backend:8080" }
+            exp_annotations:
+              summary: "Payout batch submits to the bank are failing"
+              description: "1 failed payout submit(s) in the last 5 minutes."
+              runbook: docs/sre/runbook.md#bank-payout-failures
+
+  # T-511: brand-new stack, the very first scrape already sees 1 failure (no 0 sample before it).
+  # increase() needs two samples to see a rise, so the rule must also fire for a new series that is already > 0.
+  - interval: 15s
+    input_series:
+      - series: 'payouts_total{application="expenseflow",outcome="failure",job="backend",instance="backend:8080"}'
+        values: '1 1 1 1 1 1 1 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BankPayoutFailures
+        exp_alerts:
+          - exp_labels: { severity: SEV2, application: expenseflow, outcome: failure, job: backend, instance: "backend:8080" }
+            exp_annotations:
+              summary: "Payout batch submits to the bank are failing"
+              description: "1 failed payout submit(s) in the last 5 minutes."
+              runbook: docs/sre/runbook.md#bank-payout-failures
+
+  # No failures -> no alert.
+  - interval: 15s
+    input_series:
+      - series: 'payouts_total{application="expenseflow",outcome="failure",job="backend",instance="backend:8080"}'
+        values: '0 0 0 0 0 0 0 0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BankPayoutFailures
+        exp_alerts: []
+
+  # Old failures only (series has been 1 for over 5 minutes) -> resolved, no alert.
+  - interval: 1m
+    input_series:
+      - series: 'payouts_total{application="expenseflow",outcome="failure",job="backend",instance="backend:8080"}'
+        values: '1 1 1 1 1 1 1 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: BankPayoutFailures
+        exp_alerts: []

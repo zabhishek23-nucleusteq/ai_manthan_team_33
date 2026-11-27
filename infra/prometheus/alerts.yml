@@ -25,7 +25,14 @@ groups:
 
       - alert: BankPayoutFailures
         # payouts_total{outcome} is incremented by the payout submit to the mock bank (BankCallMetrics).
-        expr: increase(payouts_total{application="expenseflow",outcome="failure"}[5m]) > 0
+        # Second branch (T-511): on a brand-new stack the first scrape can already show 1 failure; increase() needs a
+        # lower earlier sample to see a rise, so also fire for a series that is > 0 and did not exist 5 minutes ago.
+        expr: |
+          increase(payouts_total{application="expenseflow",outcome="failure"}[5m]) > 0
+          or (
+            payouts_total{application="expenseflow",outcome="failure"} > 0
+            unless payouts_total{application="expenseflow",outcome="failure"} offset 5m
+          )
         for: 1m
         labels: { severity: SEV2 }
         annotations:

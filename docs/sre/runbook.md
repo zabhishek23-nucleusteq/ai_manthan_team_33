@@ -29,6 +29,7 @@ First three checks for any alert: the Grafana panel named in the section, `docke
 - **Diagnosis:** `curl localhost:8081/admin/faults` (is a fault active: `mode` `500`/`timeout`, `latencyMs`?); `docker compose logs mock-bank --tail 100`; `curl localhost:8081/actuator/health`; backend error body names the bank answer (`BANK_UNAVAILABLE`, `BANK_TIMEOUT`).
 - **Mitigation:** if a fault is active, reset it: `curl -X DELETE localhost:8081/admin/faults`. If the bank is down: `docker compose up -d mock-bank`. Then retry the batch from Payouts (UI) or `POST /api/payout-batches/{id}/submit` with a new `Idempotency-Key`. If the outcome is unknown after a timeout, reconcile first: `GET localhost:8081/bank/payout-files?batchId=PB-<id>`.
 - **Verify:** batch status `PAID`, `payouts_total{outcome="success"}` increased, alert becomes inactive about 5 minutes after the last failure (the rule looks back 5 minutes).
+- **Rule note (T-511):** the rule also fires when the failure counter first appears already above 0 (fresh stack, failure before the first scrape); rule unit tests: `infra/prometheus/alerts.test.yml`, run in CI job `prometheus-rules`.
 - **Escalate:** payout service -> L2; mock-bank behaviour -> L3.
 
 ## Oldest pending approval
