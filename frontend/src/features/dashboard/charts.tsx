@@ -220,7 +220,7 @@ export function DonutWithLegend({
               >
                 <span aria-hidden style={{ width: 12, height: 12, borderRadius: 3, background: SERIES_COLORS[i % SERIES_COLORS.length], flex: 'none' }} />
                 <span style={{ flex: 1 }}>{d.label}</span>
-                <Typography.Text strong style={{ fontVariantNumeric: 'tabular-nums' }}>
+                <Typography.Text strong style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                   {format(d.value)}
                 </Typography.Text>
                 <Typography.Text type="secondary" style={{ width: 40, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
