@@ -82,6 +82,19 @@ public class GlobalExceptionHandler {
                 "Someone else changed this record. Reload and try again."));
     }
 
+    /** Files above the multipart limit never reach ReceiptService; same answer as its 5 MB check (BR-20). */
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    ResponseEntity<ApiError> uploadTooLarge(org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(ApiError.of(ErrorCodes.RECEIPT_TOO_LARGE, "Receipts can be at most 5 MB"));
+    }
+
+    /** Wrong type in a path or query parameter (e.g. ?status=NOPE) is a client error, not a 500. */
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ApiError> typeMismatch(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex) {
+        return ResponseEntity.badRequest().body(new ApiError(ErrorCodes.VALIDATION_FAILED, "Invalid value for " + ex.getName(),
+                Map.of("fields", Map.of(ex.getName(), "invalid value"))));
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     ResponseEntity<ApiError> forbidden(AccessDeniedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiError.of("FORBIDDEN", "You do not have access to this resource"));
