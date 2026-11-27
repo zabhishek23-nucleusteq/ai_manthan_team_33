@@ -171,3 +171,12 @@ jobs:
       - name: Stack logs on failure
         if: failure()
         run: docker compose logs --tail 200
+
+  prometheus-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check and unit-test alert rules
+        run: |
+          docker run --rm --entrypoint promtool -v "$PWD/infra/prometheus:/etc/prometheus:ro" prom/prometheus:v3.5.0 check rules /etc/prometheus/alerts.yml
+          docker run --rm --entrypoint promtool -v "$PWD/infra/prometheus:/etc/prometheus:ro" prom/prometheus:v3.5.0 test rules /etc/prometheus/alerts.test.yml
